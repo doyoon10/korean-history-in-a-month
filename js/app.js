@@ -1,0 +1,585 @@
+/* 한능검 심화 31일 완성 — 앱 로직 */
+(function () {
+  "use strict";
+
+  // ---------- 저장소 ----------
+  var KEY = "hanneung_v1";
+  var S = load();
+
+  function load() {
+    try {
+      var raw = localStorage.getItem(KEY);
+      if (raw) return JSON.parse(raw);
+    } catch (e) {}
+    return { done: {}, stats: {}, wrong: [], seen: {} };
+  }
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {}
+  }
+
+  // ---------- 유틸 ----------
+  function $(sel, root) { return (root || document).querySelector(sel); }
+  function $$(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
+  function esc(s) {
+    return String(s).replace(/[&<>"]/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+    });
+  }
+  // **굵게** 만 마크업 허용
+  function fmt(s) { return esc(s).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>"); }
+  function shuffle(a) {
+    a = a.slice();
+    for (var i = a.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+  function todayStr() {
+    var d = new Date();
+    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  }
+  function pad(n) { return n < 10 ? "0" + n : "" + n; }
+  function daysBetween(a, b) {
+    return Math.round((new Date(b + "T00:00:00") - new Date(a + "T00:00:00")) / 86400000);
+  }
+
+  var ERA_NAMES = {};
+  (window.CONCEPTS || []).forEach(function (e) { ERA_NAMES[e.id] = e.name; });
+
+  // ---------- D-day / 통계 ----------
+  function renderDday() {
+    var left = daysBetween(todayStr(), window.EXAM_DATE);
+    var el = $("#dday .dday-num");
+    el.textContent = left > 0 ? "D-" + left : (left === 0 ? "D-DAY" : "종료");
+    $("#stat-days").textContent = left > 0 ? left + "일" : "0일";
+
+    var topics = 0;
+    (window.CONCEPTS || []).forEach(function (e) { topics += e.topics.length; });
+    $("#stat-topics").textContent = topics + "개";
+    $("#stat-quiz").textContent = (window.QUIZ || []).length + "문항";
+    $("#stat-solved").textContent = Object.keys(S.seen).length + "문항";
+  }
+
+  // ---------- 탭 ----------
+  function initTabs() {
+    $$("#tabs .tab").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        showView(btn.dataset.view);
+      });
+    });
+  }
+  function showView(name) {
+    $$("#tabs .tab").forEach(function (b) { b.classList.toggle("active", b.dataset.view === name); });
+    $$(".view").forEach(function (v) { v.classList.toggle("active", v.id === "view-" + name); });
+    window.scrollTo(0, 0);
+    if (name === "dash") renderDash();
+    if (name === "wrong") renderWrong();
+  }
+
+  // ---------- 대시보드 ----------
+  function renderDash() {
+    renderDday();
+    renderToday();
+    renderProgress();
+    renderAccuracy();
+  }
+
+  function currentPlanDay() {
+    var idx = daysBetween(window.PLAN_START, todayStr());
+    if (idx < 0) return 0;
+    if (idx > window.PLAN.length - 1) return window.PLAN.length - 1;
+    return idx;
+  }
+
+  function renderToday() {
+    var p = window.PLAN[currentPlanDay()];
+    var box = $("#today-box");
+    if (!p) { box.innerHTML = '<p class="empty">플랜 기간이 아닙니다.</p>'; return; }
+    var isDone = !!S.done[p.day];
+    box.innerHTML =
+      '<div class="today-day">DAY ' + p.day + " · " + p.date + " · 권장 " + esc(p.time) + "</div>" +
+      '<div class="today-title">' + esc(p.title) + "</div>" +
+      '<ul class="today-todo">' + p.todo.map(function (t) { return "<li>" + esc(t) + "</li>"; }).join("") + "</ul>" +
+      '<div class="today-actions">' +
+      '<button class="mini' + (isDone ? " active" : "") + '" id="today-done">' + (isDone ? "완료함" : "완료 표시") + "</button>" +
+      (p.concepts.length ? '<button class="mini" id="today-concept">개념 보기</button>' : "") +
+      '<button class="mini" id="today-quiz">오늘 범위 문제 풀기</button>' +
+      "</div>";
+
+    $("#today-done").addEventListener("click", function () {
+      S.done[p.day] = !S.done[p.day]; save(); renderToday(); renderProgress(); renderPlan();
+    });
+    var cbtn = $("#today-concept");
+    if (cbtn) cbtn.addEventListener("click", function () { openConceptFor(p); });
+    $("#today-quiz").addEventListener("click", function () { startQuizFor(p.quizEra, 10, "study"); });
+  }
+
+  function renderProgress() {
+    var planDone = Object.keys(S.done).filter(function (k) { return S.done[k]; }).length;
+    var planPct = Math.round(planDone / window.PLAN.length * 100);
+
+    var total = (window.QUIZ || []).length;
+    var seen = Object.keys(S.seen).length;
+    var quizPct = total ? Math.round(seen / total * 100) : 0;
+
+    var ok = 0, all = 0;
+    Object.keys(S.stats).forEach(function (k) { ok += S.stats[k].ok; all += S.stats[k].n; });
+    var accPct = all ? Math.round(ok / all * 100) : 0;
+
+    $("#progress-box").innerHTML =
+      row("학습 플랜", planDone + " / " + window.PLAN.length + "일", planPct) +
+      row("문제 진도", seen + " / " + total + "문항", quizPct) +
+      row("전체 정답률", ok + " / " + all + "문항", accPct) +
+      '<p style="font-size:13px;color:var(--ink-soft);margin:14px 0 0">' +
+      (accPct >= 80 ? "1급 안정권입니다. 이 페이스를 유지하세요."
+        : accPct >= 70 ? "2급 안정권. 근현대 정답률을 끌어올리면 1급이 보입니다."
+        : accPct >= 60 ? "3급 안정권. 오답 노트를 두 번씩 도세요."
+        : all === 0 ? "아직 푼 문제가 없습니다. 오늘 범위부터 10문항 풀어보세요."
+        : "개념을 한 번 더 보고 같은 범위를 반복하세요.") + "</p>";
+
+    function row(label, sub, pct) {
+      return '<div class="prog-row"><div class="prog-label"><span>' + label +
+        "</span><small>" + sub + " · " + pct + '%</small></div><div class="bar"><i style="width:' + pct + '%"></i></div></div>';
+    }
+  }
+
+  function renderAccuracy() {
+    var box = $("#accuracy-box");
+    var eras = (window.CONCEPTS || []).map(function (e) { return e; });
+    var html = eras.map(function (e) {
+      var st = S.stats[e.id] || { ok: 0, n: 0 };
+      var pct = st.n ? Math.round(st.ok / st.n * 100) : 0;
+      var color = st.n === 0 ? "var(--ink-soft)" : pct >= 80 ? "var(--green)" : pct >= 60 ? "var(--orange)" : "#c92a2a";
+      return '<div class="acc-item"><div class="acc-name">' + esc(e.short) + "</div>" +
+        '<div class="acc-num" style="color:' + color + '">' + (st.n ? pct + "%" : "-") +
+        " <small>" + st.ok + "/" + st.n + "</small></div>" +
+        '<div class="bar" style="margin-top:8px"><i style="width:' + pct + "%;background:" + color + '"></i></div></div>';
+    }).join("");
+    box.innerHTML = html;
+  }
+
+  // ---------- 학습 플랜 ----------
+  var planCourse = "all";
+
+  function initPlanCourse() {
+    $$("#plan-course button").forEach(function (b) {
+      b.addEventListener("click", function () {
+        $$("#plan-course button").forEach(function (x) { x.classList.remove("active"); });
+        b.classList.add("active");
+        planCourse = b.dataset.course;
+        renderPlan();
+      });
+    });
+  }
+
+  function renderPlan() {
+    var host = $("#plan-list");
+    var today = currentPlanDay();
+    var lastPhase = null;
+    var html = "";
+    if (planCourse === "core") {
+      html += '<div class="card" style="padding:14px 16px;font-size:13.5px;color:var(--ink-soft)">' +
+        "3급(60점) 목표 최소 코스입니다. 배점이 크고 출제 빈도가 높은 " +
+        window.PLAN.filter(function (p) { return p.core; }).length +
+        "일만 남겼습니다. 시간이 남으면 1급 코스로 전환하세요.</div>";
+    }
+    window.PLAN.forEach(function (p, i) {
+      if (planCourse === "core" && !p.core) return;
+      if (p.phase !== lastPhase) {
+        lastPhase = p.phase;
+        var ph = window.PHASES[p.phase];
+        html += '<div class="phase-head"><h2>' + esc(ph.name) + "</h2><p>" + esc(ph.desc) + "</p></div>";
+      }
+      var done = !!S.done[p.day];
+      var isToday = i === today;
+      html +=
+        '<div class="plan-item' + (isToday ? " today" : "") + (done ? " done" : "") + '" data-day="' + p.day + '">' +
+        '<button class="plan-check' + (done ? " on" : "") + '" data-check="' + p.day + '">' + (done ? "✓" : "") + "</button>" +
+        '<div class="plan-body">' +
+        '<div class="plan-meta"><span>DAY ' + p.day + "</span><span>" + p.date + "</span><span>" + esc(p.time) + "</span>" +
+        (p.core ? '<span class="badge-core" title="3급 목표라면 이 날만 해도 됩니다">★ 핵심</span>' : "") +
+        (isToday ? '<span class="badge-today">오늘</span>' : "") + "</div>" +
+        '<div class="plan-title">' + esc(p.title) + "</div>" +
+        '<ul class="plan-todo">' + p.todo.map(function (t) { return "<li>" + esc(t) + "</li>"; }).join("") + "</ul>" +
+        '<div class="plan-links">' +
+        (p.concepts.length ? '<button class="mini" data-concept="' + p.day + '">개념 보기</button>' : "") +
+        '<button class="mini" data-quiz="' + p.day + '">문제 풀기</button>' +
+        "</div></div></div>";
+    });
+    host.innerHTML = html;
+
+    $$("[data-check]", host).forEach(function (b) {
+      b.addEventListener("click", function () {
+        var d = b.dataset.check;
+        S.done[d] = !S.done[d]; save(); renderPlan(); renderProgress(); renderToday();
+      });
+    });
+    $$("[data-concept]", host).forEach(function (b) {
+      b.addEventListener("click", function () {
+        openConceptFor(planByDay(b.dataset.concept));
+      });
+    });
+    $$("[data-quiz]", host).forEach(function (b) {
+      b.addEventListener("click", function () {
+        var p = planByDay(b.dataset.quiz);
+        startQuizFor(p.quizEra, 10, "study");
+      });
+    });
+  }
+  function planByDay(d) {
+    d = parseInt(d, 10);
+    for (var i = 0; i < window.PLAN.length; i++) if (window.PLAN[i].day === d) return window.PLAN[i];
+    return null;
+  }
+
+  // ---------- 개념 ----------
+  var conceptEra = "all";
+
+  function initConcept() {
+    var host = $("#concept-eras");
+    var html = '<button class="mini active" data-era="all">전체</button>';
+    (window.CONCEPTS || []).forEach(function (e) {
+      html += '<button class="mini" data-era="' + e.id + '">' + esc(e.short) + "</button>";
+    });
+    host.innerHTML = html;
+    $$("button", host).forEach(function (b) {
+      b.addEventListener("click", function () {
+        $$("button", host).forEach(function (x) { x.classList.remove("active"); });
+        b.classList.add("active");
+        conceptEra = b.dataset.era;
+        renderConcept();
+      });
+    });
+    $("#concept-search").addEventListener("input", renderConcept);
+    renderConcept();
+  }
+
+  function renderConcept(openIds) {
+    var q = $("#concept-search").value.trim().toLowerCase();
+    var host = $("#concept-list");
+    var html = "";
+    var hit = 0;
+
+    (window.CONCEPTS || []).forEach(function (era) {
+      if (conceptEra !== "all" && conceptEra !== era.id) return;
+      var topics = era.topics.filter(function (t) {
+        if (!q) return true;
+        var hay = (t.title + " " + t.points.join(" ") + " " + t.keywords.join(" ") + " " + t.tip).toLowerCase();
+        return hay.indexOf(q) !== -1;
+      });
+      if (!topics.length) return;
+      hit += topics.length;
+      html += '<div class="era-block"><h3 class="era-title">' + esc(era.name) +
+        '<span class="era-ratio">약 ' + era.ratio + "문항</span></h3>";
+      topics.forEach(function (t) {
+        var open = q || (openIds && openIds.indexOf(t.id) !== -1);
+        html +=
+          '<div class="topic' + (open ? " open" : "") + '" id="topic-' + t.id + '">' +
+          '<div class="topic-head"><span class="topic-arrow">▶</span><h3>' + esc(t.title) + "</h3></div>" +
+          '<div class="topic-body"><ul>' +
+          t.points.map(function (p) { return "<li>" + fmt(p) + "</li>"; }).join("") +
+          '</ul><div class="kw-row">' +
+          t.keywords.map(function (k) { return '<span class="kw">' + esc(k) + "</span>"; }).join("") +
+          '</div><div class="tip">' + fmt(t.tip) + "</div></div></div>";
+      });
+      html += "</div>";
+    });
+
+    host.innerHTML = hit ? html : '<p class="empty">검색 결과가 없습니다.</p>';
+    $$(".topic-head", host).forEach(function (h) {
+      h.addEventListener("click", function () { h.parentNode.classList.toggle("open"); });
+    });
+  }
+
+  function openConceptFor(p) {
+    if (!p || !p.concepts.length) return;
+    conceptEra = "all";
+    $$("#concept-eras button").forEach(function (x) { x.classList.toggle("active", x.dataset.era === "all"); });
+    $("#concept-search").value = "";
+    showView("concept");
+    renderConcept(p.concepts);
+    var first = document.getElementById("topic-" + p.concepts[0]);
+    if (first) setTimeout(function () { first.scrollIntoView({ behavior: "smooth", block: "start" }); }, 60);
+  }
+
+  // ---------- 문제 ----------
+  var quizEras = ["all"], quizN = 10, quizMode = "study";
+  var run = null;
+
+  function initQuiz() {
+    var host = $("#quiz-eras");
+    var html = '<button class="mini active" data-era="all">전체</button>';
+    (window.CONCEPTS || []).forEach(function (e) {
+      html += '<button class="mini" data-era="' + e.id + '">' + esc(e.short) + "</button>";
+    });
+    host.innerHTML = html;
+    $$("button", host).forEach(function (b) {
+      b.addEventListener("click", function () {
+        var era = b.dataset.era;
+        if (era === "all") {
+          quizEras = ["all"];
+        } else {
+          quizEras = quizEras.filter(function (x) { return x !== "all"; });
+          var i = quizEras.indexOf(era);
+          if (i === -1) quizEras.push(era); else quizEras.splice(i, 1);
+          if (!quizEras.length) quizEras = ["all"];
+        }
+        $$("button", host).forEach(function (x) {
+          x.classList.toggle("active", quizEras.indexOf(x.dataset.era) !== -1);
+        });
+      });
+    });
+
+    $$("#quiz-count button").forEach(function (b) {
+      b.addEventListener("click", function () {
+        $$("#quiz-count button").forEach(function (x) { x.classList.remove("active"); });
+        b.classList.add("active");
+        quizN = parseInt(b.dataset.n, 10);
+      });
+    });
+    $$("#quiz-mode button").forEach(function (b) {
+      b.addEventListener("click", function () {
+        $$("#quiz-mode button").forEach(function (x) { x.classList.remove("active"); });
+        b.classList.add("active");
+        quizMode = b.dataset.m;
+      });
+    });
+    $("#quiz-start").addEventListener("click", function () {
+      startQuizFor(quizEras, quizN, quizMode);
+    });
+  }
+
+  function pickQuestions(eras, n) {
+    var pool = (window.QUIZ || []).filter(function (q) {
+      if (!eras || eras.indexOf("all") !== -1) return true;
+      return eras.indexOf(q.era) !== -1;
+    });
+    pool = shuffle(pool);
+    return n > 0 ? pool.slice(0, n) : pool;
+  }
+
+  function startQuizFor(eras, n, mode) {
+    var list = pickQuestions(eras, n);
+    if (!list.length) { alert("해당 범위의 문제가 없습니다."); return; }
+    run = { list: list, i: 0, answers: [], mode: mode || "study" };
+    showView("quiz");
+    $("#quiz-setup").classList.add("hidden");
+    $("#quiz-result").classList.add("hidden");
+    $("#quiz-run").classList.remove("hidden");
+    renderQuestion();
+  }
+
+  function renderQuestion() {
+    var q = run.list[run.i];
+    var picked = run.answers[run.i];
+    var revealed = picked !== undefined && run.mode === "study";
+    var pct = Math.round(run.i / run.list.length * 100);
+
+    var html =
+      '<div class="q-progress"><div class="bar"><i style="width:' + pct + '%"></i></div>' +
+      '<span class="q-count">' + (run.i + 1) + " / " + run.list.length + "</span></div>" +
+      '<div class="q-card">' +
+      '<div class="q-meta"><span class="q-tag">' + esc(ERA_NAMES[q.era] || q.era) + "</span>" +
+      '<span class="q-tag">' + esc(q.topic) + "</span>" +
+      '<span class="q-tag diff">난이도 ' + q.diff + "/5</span></div>" +
+      '<div class="q-stem">' + esc(q.stem) + "</div>" +
+      '<div class="q-choices">';
+
+    q.choices.forEach(function (c, idx) {
+      var cls = "choice";
+      if (revealed) {
+        if (idx === q.answer) cls += " correct";
+        else if (idx === picked) cls += " wrong";
+      } else if (picked === idx) cls += " picked";
+      html += '<button class="' + cls + '" data-idx="' + idx + '"' + (revealed ? " disabled" : "") + ">" +
+        '<span class="n">' + (idx + 1) + "</span><span>" + esc(c) + "</span></button>";
+    });
+    html += "</div>";
+
+    if (revealed) {
+      var ok = picked === q.answer;
+      html += '<div class="explain"><div class="ex-head ' + (ok ? "ok" : "no") + '">' +
+        (ok ? "정답입니다" : "오답입니다 · 정답 " + (q.answer + 1) + "번") + "</div>" +
+        esc(q.explain) + '<div class="ex-kw">핵심어 · ' + esc(q.keyword) + "</div></div>";
+    }
+
+    html += '<div class="q-nav">' +
+      '<button class="mini" id="q-prev"' + (run.i === 0 ? " disabled" : "") + ">이전</button>" +
+      '<button class="mini" id="q-next">' + (run.i === run.list.length - 1 ? "채점하기" : "다음") + "</button>" +
+      "</div></div>";
+
+    $("#quiz-run").innerHTML = html;
+
+    $$("#quiz-run .choice").forEach(function (b) {
+      b.addEventListener("click", function () {
+        pick(parseInt(b.dataset.idx, 10));
+      });
+    });
+    $("#q-prev").addEventListener("click", function () {
+      if (run.i > 0) { run.i--; renderQuestion(); }
+    });
+    $("#q-next").addEventListener("click", function () {
+      if (run.i === run.list.length - 1) finishQuiz();
+      else { run.i++; renderQuestion(); }
+    });
+  }
+
+  function pick(idx) {
+    var q = run.list[run.i];
+    if (run.mode === "study" && run.answers[run.i] !== undefined) return;
+    run.answers[run.i] = idx;
+    if (run.mode === "study") {
+      record(q, idx);
+      renderQuestion();
+    } else {
+      renderQuestion();
+      if (run.i < run.list.length - 1) {
+        setTimeout(function () { run.i++; renderQuestion(); }, 160);
+      }
+    }
+  }
+
+  function record(q, idx) {
+    var ok = idx === q.answer;
+    if (!S.stats[q.era]) S.stats[q.era] = { ok: 0, n: 0 };
+    S.stats[q.era].n++;
+    if (ok) S.stats[q.era].ok++;
+    S.seen[q.id] = true;
+
+    S.wrong = S.wrong.filter(function (w) { return w.id !== q.id; });
+    if (!ok) S.wrong.unshift({ id: q.id, mine: idx, at: todayStr() });
+    save();
+  }
+
+  function finishQuiz() {
+    if (run.mode === "test") {
+      run.list.forEach(function (q, i) {
+        if (run.answers[i] !== undefined) record(q, run.answers[i]);
+      });
+    }
+    var ok = 0;
+    run.list.forEach(function (q, i) { if (run.answers[i] === q.answer) ok++; });
+    var total = run.list.length;
+    var score = Math.round(ok / total * 100);
+    var grade = score >= 80 ? "심화 1급 수준" : score >= 70 ? "심화 2급 수준" : score >= 60 ? "심화 3급 수준" : "불합격 구간";
+    var msg = score >= 80 ? "이 페이스면 1급 충분합니다. 남은 기간은 근현대와 오답 노트에 집중하세요."
+      : score >= 70 ? "2급은 안정권입니다. 틀린 시대 개념을 한 번 더 보면 1급이 보입니다."
+      : score >= 60 ? "3급 합격선입니다. 오답 노트를 두 번 돌면 확실해집니다."
+      : "개념 탭에서 해당 시대를 다시 읽고 같은 범위를 한 번 더 푸세요.";
+
+    var wrongList = [];
+    run.list.forEach(function (q, i) {
+      if (run.answers[i] !== q.answer) wrongList.push({ q: q, mine: run.answers[i] });
+    });
+
+    var html = '<div class="card result-hero">' +
+      '<div class="result-score">' + score + "점</div>" +
+      '<div class="result-grade">' + grade + " · " + ok + " / " + total + "문항</div>" +
+      '<p class="result-msg">' + msg + "</p>" +
+      '<div class="result-actions">' +
+      '<button class="primary" id="res-again">같은 범위 다시</button>' +
+      '<button class="mini" id="res-wrong">오답 노트 보기</button>' +
+      '<button class="mini" id="res-home">설정으로</button>' +
+      "</div></div>";
+
+    if (wrongList.length) {
+      html += '<div class="card"><h2>틀린 문제 ' + wrongList.length + "개</h2>" +
+        wrongList.map(function (w) {
+          return '<div class="wrong-item"><div class="wrong-stem">' + esc(w.q.stem) + "</div>" +
+            '<div class="wrong-ans">정답 ' + (w.q.answer + 1) + "번 · " + esc(w.q.choices[w.q.answer]) + "</div>" +
+            (w.mine !== undefined ? '<div class="wrong-mine">내 답 ' + (w.mine + 1) + "번 · " + esc(w.q.choices[w.mine]) + "</div>" : '<div class="wrong-mine">무응답</div>') +
+            '<div class="wrong-ex">' + esc(w.q.explain) + "</div></div>";
+        }).join("") + "</div>";
+    }
+
+    $("#quiz-run").classList.add("hidden");
+    $("#quiz-result").classList.remove("hidden");
+    $("#quiz-result").innerHTML = html;
+
+    $("#res-again").addEventListener("click", function () {
+      startQuizFor(quizEras, quizN, quizMode);
+    });
+    $("#res-wrong").addEventListener("click", function () { showView("wrong"); });
+    $("#res-home").addEventListener("click", function () {
+      $("#quiz-result").classList.add("hidden");
+      $("#quiz-setup").classList.remove("hidden");
+    });
+  }
+
+  // ---------- 오답 노트 ----------
+  function qById(id) {
+    var list = window.QUIZ || [];
+    for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i];
+    return null;
+  }
+
+  function renderWrong() {
+    var host = $("#wrong-list");
+    if (!S.wrong.length) {
+      host.innerHTML = '<p class="empty">아직 오답이 없습니다. 문제를 풀면 틀린 문항이 여기 쌓입니다.</p>';
+      return;
+    }
+    host.innerHTML = S.wrong.map(function (w) {
+      var q = qById(w.id);
+      if (!q) return "";
+      return '<div class="wrong-item">' +
+        '<div class="q-meta"><span class="q-tag">' + esc(ERA_NAMES[q.era] || q.era) + "</span>" +
+        '<span class="q-tag">' + esc(q.topic) + '</span><span class="q-tag">' + w.at + "</span></div>" +
+        '<div class="wrong-stem">' + esc(q.stem) + "</div>" +
+        '<div class="wrong-ans">정답 ' + (q.answer + 1) + "번 · " + esc(q.choices[q.answer]) + "</div>" +
+        '<div class="wrong-mine">내 답 ' + (w.mine + 1) + "번 · " + esc(q.choices[w.mine]) + "</div>" +
+        '<div class="wrong-ex">' + esc(q.explain) + '<div class="ex-kw" style="margin-top:6px;font-size:12px">핵심어 · ' + esc(q.keyword) + "</div></div></div>";
+    }).join("");
+  }
+
+  function initWrong() {
+    $("#wrong-retry").addEventListener("click", function () {
+      var list = S.wrong.map(function (w) { return qById(w.id); }).filter(Boolean);
+      if (!list.length) { alert("오답 노트가 비어 있습니다."); return; }
+      run = { list: shuffle(list), i: 0, answers: [], mode: "study" };
+      showView("quiz");
+      $("#quiz-setup").classList.add("hidden");
+      $("#quiz-result").classList.add("hidden");
+      $("#quiz-run").classList.remove("hidden");
+      renderQuestion();
+    });
+    $("#wrong-clear").addEventListener("click", function () {
+      if (!confirm("오답 노트를 모두 비울까요?")) return;
+      S.wrong = []; save(); renderWrong();
+    });
+  }
+
+  // ---------- 연표 ----------
+  function renderTimeline() {
+    var q = $("#tl-search").value.trim().toLowerCase();
+    var html = "";
+    (window.TIMELINE || []).forEach(function (g) {
+      var rows = g.items.filter(function (it) {
+        if (!q) return true;
+        return (it[0] + " " + it[1]).toLowerCase().indexOf(q) !== -1;
+      });
+      if (!rows.length) return;
+      html += '<div class="tl-group"><h2>' + esc(g.g) + "</h2>" +
+        rows.map(function (it) {
+          return '<div class="tl-row"><div class="tl-year">' + esc(it[0]) + '</div><div class="tl-txt">' + esc(it[1]) + "</div></div>";
+        }).join("") + "</div>";
+    });
+    $("#timeline-list").innerHTML = html || '<p class="empty">검색 결과가 없습니다.</p>';
+  }
+
+  function initTimeline() {
+    $("#tl-search").addEventListener("input", renderTimeline);
+    renderTimeline();
+  }
+
+  // ---------- 시작 ----------
+  initTabs();
+  initConcept();
+  initQuiz();
+  initWrong();
+  initTimeline();
+  initPlanCourse();
+  renderPlan();
+  renderDash();
+})();

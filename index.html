@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>한달 한국사 · Korean History in a Month</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <span class="brand-mark">韓</span>
+      <div>
+        <div class="brand-title">한달 한국사</div>
+        <div class="brand-sub">Korean History in a Month · 심화 대비 31일 플랜</div>
+      </div>
+    </div>
+    <div class="dday" id="dday">
+      <div class="dday-num">D-</div>
+      <div class="dday-label">2026.10.17 시험</div>
+    </div>
+  </div>
+  <nav class="tabs" id="tabs">
+    <button class="tab active" data-view="dash">대시보드</button>
+    <button class="tab" data-view="plan">학습 플랜</button>
+    <button class="tab" data-view="concept">개념 정리</button>
+    <button class="tab" data-view="quiz">기출 문제</button>
+    <button class="tab" data-view="wrong">오답 노트</button>
+    <button class="tab" data-view="timeline">연표·암기</button>
+  </nav>
+</header>
+
+<main id="app">
+
+  <!-- 대시보드 -->
+  <section class="view active" id="view-dash">
+    <div class="hero">
+      <h1>1달 안에 심화 <b>1급</b>까지 갑니다</h1>
+      <p class="hero-sub">심화 1급은 80점, 2급 70점, 3급 60점입니다. 총 50문항, 80분, 문항당 2점.
+      근현대(개항기~현대)가 <b>전체의 약 40%</b>라 여기서 점수가 갈립니다.</p>
+      <div class="hero-stat">
+        <div class="stat"><span id="stat-days">-</span><small>남은 일수</small></div>
+        <div class="stat"><span id="stat-topics">-</span><small>개념 주제</small></div>
+        <div class="stat"><span id="stat-quiz">-</span><small>기출 문항</small></div>
+        <div class="stat"><span id="stat-solved">-</span><small>푼 문항</small></div>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <h2>오늘의 학습</h2>
+        <div id="today-box"></div>
+      </div>
+      <div class="card">
+        <h2>진도율</h2>
+        <div id="progress-box"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>시대별 정답률</h2>
+      <div id="accuracy-box" class="accuracy-list"></div>
+    </div>
+
+    <div class="card strategy">
+      <h2>합격 전략 요약</h2>
+      <ol>
+        <li><b>순서대로 하지 말고 비중대로.</b> 근현대(개항기·일제·현대)가 20문항 안팎입니다. 1주차에 전근대를 빠르게 훑고 2주차부터 근현대에 시간을 몰아주세요.</li>
+        <li><b>왕·사건 매칭이 전부입니다.</b> 심화 문제의 70%는 "이 자료가 누구/언제냐"를 묻습니다. 개념 페이지의 <span class="chip">핵심 키워드</span>만 봐도 답이 떠오르면 그 주제는 끝난 겁니다.</li>
+        <li><b>순서 나열 문제는 반드시 연표로.</b> 연표 탭의 연도 100개를 하루 5분씩 반복하세요.</li>
+        <li><b>1급이 목표면 하루 2시간, 3급이 목표면 하루 1시간.</b> 3급만 필요하면 플랜에서 ★ 표시된 날만 해도 60점은 나옵니다.</li>
+        <li><b>마지막 5일은 새 개념 금지.</b> 오답 노트와 모의고사만 도세요.</li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- 학습 플랜 -->
+  <section class="view" id="view-plan">
+    <div class="view-head">
+      <h1>31일 학습 플랜</h1>
+      <p>오늘 날짜에 맞춰 자동으로 하이라이트됩니다. 체크하면 진도율에 반영됩니다.</p>
+    </div>
+    <div class="btn-group" id="plan-course" style="margin-bottom:16px">
+      <button class="mini active" data-course="all">1급 코스 · 31일 전부</button>
+      <button class="mini" data-course="core">3급 코스 · ★ 핵심일만</button>
+    </div>
+    <div id="plan-list"></div>
+  </section>
+
+  <!-- 개념 정리 -->
+  <section class="view" id="view-concept">
+    <div class="view-head">
+      <h1>개념 정리</h1>
+      <p>시대를 고르고 주제를 펼쳐 보세요. <b>굵은 글씨</b>가 시험에 그대로 나오는 부분입니다.</p>
+    </div>
+    <div class="era-filter" id="concept-eras"></div>
+    <div class="search-row">
+      <input type="search" id="concept-search" placeholder="키워드 검색 (예: 신문왕, 대동법, 신간회)">
+    </div>
+    <div id="concept-list"></div>
+  </section>
+
+  <!-- 기출 문제 -->
+  <section class="view" id="view-quiz">
+    <div class="view-head">
+      <h1>기출 유형 문제</h1>
+      <p>범위와 문항 수를 고르고 시작하세요. 틀린 문제는 자동으로 오답 노트에 저장됩니다.</p>
+    </div>
+    <div id="quiz-setup" class="card">
+      <h2>문제 설정</h2>
+      <div class="setup-row">
+        <label>범위</label>
+        <div class="era-filter" id="quiz-eras"></div>
+      </div>
+      <div class="setup-row">
+        <label>문항 수</label>
+        <div class="btn-group" id="quiz-count">
+          <button class="mini active" data-n="10">10문항</button>
+          <button class="mini" data-n="20">20문항</button>
+          <button class="mini" data-n="30">30문항</button>
+          <button class="mini" data-n="0">전체</button>
+        </div>
+      </div>
+      <div class="setup-row">
+        <label>모드</label>
+        <div class="btn-group" id="quiz-mode">
+          <button class="mini active" data-m="study">학습 모드 (바로 해설)</button>
+          <button class="mini" data-m="test">실전 모드 (끝나고 채점)</button>
+        </div>
+      </div>
+      <button class="primary" id="quiz-start">문제 풀기 시작</button>
+    </div>
+    <div id="quiz-run" class="hidden"></div>
+    <div id="quiz-result" class="hidden"></div>
+  </section>
+
+  <!-- 오답 노트 -->
+  <section class="view" id="view-wrong">
+    <div class="view-head">
+      <h1>오답 노트</h1>
+      <p>틀린 문제만 모았습니다. 시험 전날에는 이것만 보세요.</p>
+    </div>
+    <div class="btn-group" style="margin-bottom:16px">
+      <button class="mini" id="wrong-retry">오답만 다시 풀기</button>
+      <button class="mini danger" id="wrong-clear">오답 노트 비우기</button>
+    </div>
+    <div id="wrong-list"></div>
+  </section>
+
+  <!-- 연표 -->
+  <section class="view" id="view-timeline">
+    <div class="view-head">
+      <h1>연표 · 암기 카드</h1>
+      <p>순서 나열 문제 대비용입니다. 하루 5분씩 반복하세요.</p>
+    </div>
+    <div class="search-row">
+      <input type="search" id="tl-search" placeholder="연표 검색 (예: 1592, 갑오, 환국)">
+    </div>
+    <div id="timeline-list"></div>
+  </section>
+
+</main>
+
+<footer class="foot">
+  <p>학습 기록은 이 브라우저에만 저장됩니다. 시험 준비 화이팅.</p>
+</footer>
+
+<script src="js/data/concepts_1.js"></script>
+<script src="js/data/concepts_2.js"></script>
+<script src="js/data/concepts_3.js"></script>
+<script src="js/data/quiz_1.js"></script>
+<script src="js/data/quiz_2.js"></script>
+<script src="js/data/quiz_3.js"></script>
+<script src="js/data/plan.js"></script>
+<script src="js/data/timeline.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
