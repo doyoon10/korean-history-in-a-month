@@ -99,6 +99,7 @@ main{max-width:1040px;margin:0 auto;padding:24px 20px 60px}
 .today-todo{margin:0;padding-left:18px;font-size:14px;color:var(--ink-soft)}
 .today-todo li{margin-bottom:4px}
 .today-actions{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+.today-note{margin:12px 0 0;font-size:13px;color:#8a6d00;background:#fff8db;border-radius:8px;padding:7px 10px}
 
 /* ---------- progress ---------- */
 .bar{height:9px;background:#eceae5;border-radius:99px;overflow:hidden;margin:6px 0 4px}

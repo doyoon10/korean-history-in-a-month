@@ -85,26 +85,58 @@
     renderAccuracy();
   }
 
-  function currentPlanDay() {
-    var idx = daysBetween(window.PLAN_START, todayStr());
-    if (idx < 0) return 0;
-    if (idx > window.PLAN.length - 1) return window.PLAN.length - 1;
-    return idx;
+  // 진도 기준: 현재 코스에서 아직 체크하지 않은 가장 이른 날
+  function courseDays() {
+    return window.PLAN.filter(function (p) { return S.course !== "core" || p.core; });
+  }
+  function currentPlan() {
+    var days = courseDays();
+    for (var i = 0; i < days.length; i++) if (!S.done[days[i].day]) return days[i];
+    return days[days.length - 1];
+  }
+  function calendarDay() {
+    var d = daysBetween(window.PLAN_START, todayStr()) + 1;
+    return Math.max(1, Math.min(window.PLAN.length, d));
+  }
+  function scheduleNote(p) {
+    var cal = calendarDay();
+    var behind = courseDays().filter(function (d) { return d.day < cal && !S.done[d.day]; }).length;
+    if (behind > 0) return "달력으로는 DAY " + cal + " 차례입니다. " + behind + "일 밀려 있어요.";
+    if (p.day > cal) return "일정보다 앞서 있습니다.";
+    return "";
   }
 
+  // 출제 범위: 그날 주제만 / 1일차부터 그날까지 누적
+  function conceptsUpTo(day) {
+    var out = [];
+    window.PLAN.forEach(function (p) { if (p.day <= day) out = out.concat(p.concepts); });
+    return out;
+  }
+  function dayFilter(p) {
+    return { concepts: p.concepts.length ? p.concepts : conceptsUpTo(p.day) };
+  }
+  function learnedFilter(p) {
+    return { concepts: conceptsUpTo(p.day) };
+  }
+  function countFor(filter) { return pickQuestions(filter, 0).length; }
+
   function renderToday() {
-    var p = window.PLAN[currentPlanDay()];
+    var p = currentPlan();
     var box = $("#today-box");
     if (!p) { box.innerHTML = '<p class="empty">플랜 기간이 아닙니다.</p>'; return; }
     var isDone = !!S.done[p.day];
+    var note = scheduleNote(p);
+    var nDay = countFor(dayFilter(p)), nAll = countFor(learnedFilter(p));
     box.innerHTML =
       '<div class="today-day">DAY ' + p.day + " · " + p.date + " · 권장 " + esc(p.time) + "</div>" +
       '<div class="today-title">' + esc(p.title) + "</div>" +
       '<ul class="today-todo">' + p.todo.map(function (t) { return "<li>" + esc(t) + "</li>"; }).join("") + "</ul>" +
+      (note ? '<p class="today-note">' + esc(note) + "</p>" : "") +
       '<div class="today-actions">' +
       '<button class="mini' + (isDone ? " active" : "") + '" id="today-done">' + (isDone ? "완료함" : "완료 표시") + "</button>" +
       (p.concepts.length ? '<button class="mini" id="today-concept">개념 보기</button>' : "") +
-      '<button class="mini" id="today-quiz">오늘 범위 문제 풀기</button>' +
+      (p.concepts.length ? '<button class="mini" id="today-quiz">오늘 범위 문제 ' + nDay + "</button>" : "") +
+      '<button class="mini" id="today-learned">배운 범위 누적 ' + nAll + "</button>" +
       "</div>";
 
     $("#today-done").addEventListener("click", function () {
@@ -112,7 +144,9 @@
     });
     var cbtn = $("#today-concept");
     if (cbtn) cbtn.addEventListener("click", function () { openConceptFor(p); });
-    $("#today-quiz").addEventListener("click", function () { startQuizFor(p.quizEra, 10, "study"); });
+    var qbtn = $("#today-quiz");
+    if (qbtn) qbtn.addEventListener("click", function () { startQuizFor(dayFilter(p), 10, "study"); });
+    $("#today-learned").addEventListener("click", function () { startQuizFor(learnedFilter(p), 10, "study"); });
   }
 
   function renderProgress() {
@@ -160,22 +194,22 @@
   }
 
   // ---------- 학습 플랜 ----------
-  var planCourse = "all";
-
   function initPlanCourse() {
     $$("#plan-course button").forEach(function (b) {
+      b.classList.toggle("active", b.dataset.course === (S.course || "all"));
       b.addEventListener("click", function () {
         $$("#plan-course button").forEach(function (x) { x.classList.remove("active"); });
         b.classList.add("active");
-        planCourse = b.dataset.course;
-        renderPlan();
+        S.course = b.dataset.course; save();
+        renderPlan(); renderToday();
       });
     });
   }
 
   function renderPlan() {
     var host = $("#plan-list");
-    var today = currentPlanDay();
+    var today = currentPlan().day;
+    var planCourse = S.course || "all";
     var lastPhase = null;
     var html = "";
     if (planCourse === "core") {
@@ -192,7 +226,7 @@
         html += '<div class="phase-head"><h2>' + esc(ph.name) + "</h2><p>" + esc(ph.desc) + "</p></div>";
       }
       var done = !!S.done[p.day];
-      var isToday = i === today;
+      var isToday = p.day === today;
       html +=
         '<div class="plan-item' + (isToday ? " today" : "") + (done ? " done" : "") + '" data-day="' + p.day + '">' +
         '<button class="plan-check' + (done ? " on" : "") + '" data-check="' + p.day + '">' + (done ? "✓" : "") + "</button>" +
@@ -204,7 +238,8 @@
         '<ul class="plan-todo">' + p.todo.map(function (t) { return "<li>" + esc(t) + "</li>"; }).join("") + "</ul>" +
         '<div class="plan-links">' +
         (p.concepts.length ? '<button class="mini" data-concept="' + p.day + '">개념 보기</button>' : "") +
-        '<button class="mini" data-quiz="' + p.day + '">문제 풀기</button>' +
+        (p.concepts.length ? '<button class="mini" data-quiz="' + p.day + '">그날 문제 ' + countFor(dayFilter(p)) + "</button>" : "") +
+        '<button class="mini" data-learned="' + p.day + '">누적 ' + countFor(learnedFilter(p)) + "</button>" +
         "</div></div></div>";
     });
     host.innerHTML = html;
@@ -222,8 +257,12 @@
     });
     $$("[data-quiz]", host).forEach(function (b) {
       b.addEventListener("click", function () {
-        var p = planByDay(b.dataset.quiz);
-        startQuizFor(p.quizEra, 10, "study");
+        startQuizFor(dayFilter(planByDay(b.dataset.quiz)), 10, "study");
+      });
+    });
+    $$("[data-learned]", host).forEach(function (b) {
+      b.addEventListener("click", function () {
+        startQuizFor(learnedFilter(planByDay(b.dataset.learned)), 10, "study");
       });
     });
   }
@@ -309,7 +348,8 @@
 
   function initQuiz() {
     var host = $("#quiz-eras");
-    var html = '<button class="mini active" data-era="all">전체</button>';
+    var html = '<button class="mini active" data-era="all">전체</button>' +
+      '<button class="mini" data-era="learned">배운 범위까지</button>';
     (window.CONCEPTS || []).forEach(function (e) {
       html += '<button class="mini" data-era="' + e.id + '">' + esc(e.short) + "</button>";
     });
@@ -317,10 +357,10 @@
     $$("button", host).forEach(function (b) {
       b.addEventListener("click", function () {
         var era = b.dataset.era;
-        if (era === "all") {
-          quizEras = ["all"];
+        if (era === "all" || era === "learned") {
+          quizEras = [era];
         } else {
-          quizEras = quizEras.filter(function (x) { return x !== "all"; });
+          quizEras = quizEras.filter(function (x) { return x !== "all" && x !== "learned"; });
           var i = quizEras.indexOf(era);
           if (i === -1) quizEras.push(era); else quizEras.splice(i, 1);
           if (!quizEras.length) quizEras = ["all"];
@@ -346,23 +386,32 @@
       });
     });
     $("#quiz-start").addEventListener("click", function () {
-      startQuizFor(quizEras, quizN, quizMode);
+      startQuizFor(setupFilter(), quizN, quizMode);
     });
   }
 
-  function pickQuestions(eras, n) {
+  function setupFilter() {
+    if (quizEras[0] === "learned") return learnedFilter(currentPlan());
+    return { eras: quizEras };
+  }
+
+  // filter: { concepts:[주제 id] } 또는 { eras:[시대 id | "all"] }
+  function pickQuestions(filter, n) {
+    filter = filter || { eras: ["all"] };
     var pool = (window.QUIZ || []).filter(function (q) {
-      if (!eras || eras.indexOf("all") !== -1) return true;
+      if (filter.concepts) return filter.concepts.indexOf(q.concept) !== -1;
+      var eras = filter.eras || ["all"];
+      if (eras.indexOf("all") !== -1) return true;
       return eras.indexOf(q.era) !== -1;
     });
     pool = shuffle(pool);
     return n > 0 ? pool.slice(0, n) : pool;
   }
 
-  function startQuizFor(eras, n, mode) {
-    var list = pickQuestions(eras, n);
+  function startQuizFor(filter, n, mode) {
+    var list = pickQuestions(filter, n);
     if (!list.length) { alert("해당 범위의 문제가 없습니다."); return; }
-    run = { list: list, i: 0, answers: [], mode: mode || "study" };
+    run = { list: list, i: 0, answers: [], mode: mode || "study", filter: filter, n: n };
     showView("quiz");
     $("#quiz-setup").classList.add("hidden");
     $("#quiz-result").classList.add("hidden");
@@ -468,6 +517,10 @@
       : score >= 60 ? "3급 합격선입니다. 오답 노트를 두 번 돌면 확실해집니다."
       : "개념 탭에서 해당 시대를 다시 읽고 같은 범위를 한 번 더 푸세요.";
 
+    if (run.n > 0 && total < run.n) {
+      msg += " 이 범위에 준비된 문제는 " + total + "개입니다. 대시보드의 배운 범위 누적으로 더 풀 수 있습니다.";
+    }
+
     var wrongList = [];
     run.list.forEach(function (q, i) {
       if (run.answers[i] !== q.answer) wrongList.push({ q: q, mine: run.answers[i] });
@@ -497,8 +550,10 @@
     $("#quiz-result").classList.remove("hidden");
     $("#quiz-result").innerHTML = html;
 
+    var last = run;
     $("#res-again").addEventListener("click", function () {
-      startQuizFor(quizEras, quizN, quizMode);
+      if (last.retryWrong) { $("#wrong-retry").click(); return; }
+      startQuizFor(last.filter, last.n, last.mode);
     });
     $("#res-wrong").addEventListener("click", function () { showView("wrong"); });
     $("#res-home").addEventListener("click", function () {
@@ -537,7 +592,7 @@
     $("#wrong-retry").addEventListener("click", function () {
       var list = S.wrong.map(function (w) { return qById(w.id); }).filter(Boolean);
       if (!list.length) { alert("오답 노트가 비어 있습니다."); return; }
-      run = { list: shuffle(list), i: 0, answers: [], mode: "study" };
+      run = { list: shuffle(list), i: 0, answers: [], mode: "study", retryWrong: true, n: 0 };
       showView("quiz");
       $("#quiz-setup").classList.add("hidden");
       $("#quiz-result").classList.add("hidden");
