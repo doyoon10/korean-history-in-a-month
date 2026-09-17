@@ -188,9 +188,39 @@
       return '<div class="acc-item"><div class="acc-name">' + esc(e.short) + "</div>" +
         '<div class="acc-num" style="color:' + color + '">' + (st.n ? pct + "%" : "-") +
         " <small>" + st.ok + "/" + st.n + "</small></div>" +
-        '<div class="bar" style="margin-top:8px"><i style="width:' + pct + "%;background:" + color + '"></i></div></div>';
+        '<div class="bar" style="margin-top:8px"><i style="width:' + pct + "%;background:" + color + '"></i></div>' +
+        (st.n ? '<button class="mini acc-reset" data-reset="' + e.id + '">기록 지우기</button>' : "") +
+        "</div>";
     }).join("");
     box.innerHTML = html;
+
+    $$("[data-reset]", box).forEach(function (b) {
+      b.addEventListener("click", function () {
+        var era = b.dataset.reset;
+        if (!confirm(ERA_NAMES[era] + " 기록을 지울까요?\n정답률, 푼 문항, 이 시대의 오답 노트가 함께 지워집니다.")) return;
+        resetEra(era);
+        renderDash(); renderWrong();
+      });
+    });
+  }
+
+  // 한 시대의 학습 기록만 삭제
+  function resetEra(era) {
+    var ids = (window.QUIZ || []).filter(function (q) { return q.era === era; })
+      .map(function (q) { return q.id; });
+    delete S.stats[era];
+    ids.forEach(function (id) { delete S.seen[id]; });
+    S.wrong = S.wrong.filter(function (w) { return ids.indexOf(w.id) === -1; });
+    save();
+  }
+
+  function initReset() {
+    $("#acc-reset-all").addEventListener("click", function () {
+      if (!confirm("모든 학습 기록을 지울까요?\n플랜 체크, 정답률, 오답 노트가 전부 사라집니다.")) return;
+      S = { done: {}, stats: {}, wrong: [], seen: {}, course: S.course };
+      save();
+      renderDash(); renderPlan(); renderWrong();
+    });
   }
 
   // ---------- 학습 플랜 ----------
@@ -634,6 +664,7 @@
   initQuiz();
   initWrong();
   initTimeline();
+  initReset();
   initPlanCourse();
   renderPlan();
   renderDash();
