@@ -635,21 +635,105 @@
     });
   }
 
-  // ---------- 연표 ----------
-  function renderTimeline() {
-    var q = $("#tl-search").value.trim().toLowerCase();
+  // ---------- 연표 (타임라인) ----------
+  var TL_COLORS = { red: "#c92a2a", blue: "#2f5cd4", green: "#2f9e44", orange: "#e8590c", brown: "#8b5a2b", gray: "#6b7280" };
+  function tlColor(c) { return TL_COLORS[c] || TL_COLORS.gray; }
+  function yearText(y) { return y < 0 ? "BC " + (-y) : String(y); }
+
+  // 기간을 행 구간으로 바꾸고, 겹치는 기간은 서로 다른 줄(lane)에 배치한다
+  function layoutGroup(g) {
+    var rows = g.rows.slice().sort(function (a, b) { return a.y - b.y; });
+    var first = rows[0].y, last = rows[rows.length - 1].y;
+    var bars = [];
+    g.periods.forEach(function (p) {
+      if (p.t < first || p.f > last) return;
+      var s = rows.length - 1, e = 0, i;
+      for (i = 0; i < rows.length; i++) if (rows[i].y >= p.f) { s = i; break; }
+      for (i = rows.length - 1; i >= 0; i--) if (rows[i].y <= p.t) { e = i; break; }
+      if (e < s) e = s;
+      bars.push({ p: p, s: s, e: e, fromBefore: p.f < first, toAfter: p.t > last });
+    });
+    bars.sort(function (a, b) { return a.s - b.s || (b.e - b.s) - (a.e - a.s); });
+    var laneEnd = [];
+    bars.forEach(function (b) {
+      var lane = 0;
+      while (lane < laneEnd.length && laneEnd[lane] >= b.s) lane++;
+      laneEnd[lane] = b.e;
+      b.lane = lane;
+    });
+    var chips = rows.map(function () { return []; });
+    bars.forEach(function (b) {
+      if (!b.fromBefore) chips[b.s].push({ n: b.p.n, kind: "start", c: b.p.c, y: rows[b.s].y !== b.p.f ? b.p.f : null });
+      if (!b.toAfter) chips[b.e].push({ n: b.p.n, kind: "end", c: b.p.c, y: rows[b.e].y !== b.p.t ? b.p.t : null });
+    });
+    return { rows: rows, bars: bars, lanes: Math.max(1, laneEnd.length), chips: chips };
+  }
+
+  function chipHtml(ch) {
+    return '<span class="tl-chip ' + ch.kind + '" style="--c:' + tlColor(ch.c) + '">' +
+      esc(ch.n) + (ch.kind === "start" ? " 시작" : " 끝") +
+      (ch.y !== null ? " <small>" + yearText(ch.y) + "</small>" : "") + "</span>";
+  }
+
+  function rowBodyHtml(r, chips) {
+    var pivot = chips.some(function (c) { return c.kind === "end"; }) && chips.some(function (c) { return c.kind === "start"; });
+    var multi = r.items.length > 1;
+    return '<div class="tl-body' + (multi ? " multi" : "") + (pivot ? " pivot" : "") + '">' +
+      (chips.length ? '<div class="tl-chips">' + chips.map(chipHtml).join("") + "</div>" : "") +
+      (multi ? '<div class="tl-same">같은 해 ' + r.items.length + "건</div>" : "") +
+      '<ul class="tl-items">' + r.items.map(function (t) { return "<li>" + esc(t) + "</li>"; }).join("") + "</ul>" +
+      (r.note ? '<p class="tl-note">' + esc(r.note) + "</p>" : "") +
+      "</div>";
+  }
+
+  function renderTimelineGroup(g) {
+    var L = layoutGroup(g);
+    var legend = L.bars.slice().sort(function (a, b) { return a.lane - b.lane || a.s - b.s; }).map(function (b) {
+      return '<span class="tl-leg"><i style="background:' + tlColor(b.p.c) + '"></i>' + esc(b.p.n) +
+        " <small>" + yearText(b.p.f) + "~" + yearText(b.p.t) + "</small></span>";
+    }).join("");
+    var html = '<div class="tl-group"><h2>' + esc(g.g) + '</h2><div class="tl-legend">' + legend + "</div>" +
+      '<div class="tl-grid" style="--lanes:' + L.lanes + '">';
+    L.bars.forEach(function (b) {
+      html += '<div class="tl-bar' + (b.fromBefore ? " from-before" : "") + (b.toAfter ? " to-after" : "") +
+        '" style="grid-column:' + (b.lane + 1) + ";grid-row:" + (b.s + 1) + " / " + (b.e + 2) + ";--c:" + tlColor(b.p.c) +
+        '" title="' + esc(b.p.n + " " + yearText(b.p.f) + "~" + yearText(b.p.t)) + '"><span>' + esc(b.p.n) + "</span></div>";
+    });
+    L.rows.forEach(function (r, i) {
+      html += '<div class="tl-year" style="grid-column:' + (L.lanes + 1) + ";grid-row:" + (i + 1) + '"><b>' + esc(r.label) + "</b></div>" +
+        '<div class="tl-cell" style="grid-column:' + (L.lanes + 2) + ";grid-row:" + (i + 1) + '">' + rowBodyHtml(r, L.chips[i]) + "</div>";
+    });
+    return html + "</div></div>";
+  }
+
+  // 검색: 사건·설명에 걸리는 행 + 이름이 걸리는 기간 안의 모든 행
+  function renderTimelineSearch(q) {
     var html = "";
     (window.TIMELINE || []).forEach(function (g) {
-      var rows = g.items.filter(function (it) {
-        if (!q) return true;
-        return (it[0] + " " + it[1]).toLowerCase().indexOf(q) !== -1;
+      var L = layoutGroup(g);
+      var hitPeriods = g.periods.filter(function (p) { return p.n.toLowerCase().indexOf(q) !== -1; });
+      var rows = [];
+      L.rows.forEach(function (r, i) {
+        var hay = (r.label + " " + r.items.join(" ") + " " + (r.note || "")).toLowerCase();
+        var inPeriod = hitPeriods.some(function (p) { return r.y >= p.f && r.y <= p.t; });
+        if (hay.indexOf(q) !== -1 || inPeriod) rows.push(i);
       });
       if (!rows.length) return;
       html += '<div class="tl-group"><h2>' + esc(g.g) + "</h2>" +
-        rows.map(function (it) {
-          return '<div class="tl-row"><div class="tl-year">' + esc(it[0]) + '</div><div class="tl-txt">' + esc(it[1]) + "</div></div>";
-        }).join("") + "</div>";
+        (hitPeriods.length ? '<div class="tl-legend">' + hitPeriods.map(function (p) {
+          return '<span class="tl-leg"><i style="background:' + tlColor(p.c) + '"></i>' + esc(p.n) +
+            " <small>" + yearText(p.f) + "~" + yearText(p.t) + "</small></span>";
+        }).join("") + "</div>" : "") +
+        '<div class="tl-flat">' + rows.map(function (i) {
+          return '<div class="tl-flat-row"><div class="tl-year"><b>' + esc(L.rows[i].label) + "</b></div>" + rowBodyHtml(L.rows[i], L.chips[i]) + "</div>";
+        }).join("") + "</div></div>";
     });
+    return html;
+  }
+
+  function renderTimeline() {
+    var q = $("#tl-search").value.trim().toLowerCase();
+    var html = q ? renderTimelineSearch(q) : (window.TIMELINE || []).map(renderTimelineGroup).join("");
     $("#timeline-list").innerHTML = html || '<p class="empty">검색 결과가 없습니다.</p>';
   }
 

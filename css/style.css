@@ -261,20 +261,64 @@ main{max-width:1040px;margin:0 auto;padding:24px 20px 60px}
 .empty{text-align:center;padding:50px 20px;color:var(--ink-soft);font-size:14px}
 
 /* ---------- timeline ---------- */
-.tl-group{margin-bottom:24px}
-.tl-group h2{
-  font-size:16px;margin:0 0 10px;padding-left:11px;
-  border-left:4px solid var(--accent);letter-spacing:-.3px;
+.tl-group{margin-bottom:34px}
+.tl-group h2{font-size:17px;margin:0 0 10px;padding-left:11px;border-left:4px solid var(--accent);letter-spacing:-.3px}
+.tl-legend{display:flex;flex-wrap:wrap;gap:6px 12px;margin:0 0 12px;font-size:12px;color:var(--ink-soft)}
+.tl-leg{display:inline-flex;align-items:center;gap:5px}
+.tl-leg i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.tl-leg small{color:#9aa0a6}
+.tl-grid{
+  --lane-w:22px;--year-w:92px;
+  display:grid;grid-template-columns:repeat(var(--lanes),var(--lane-w)) var(--year-w) minmax(0,1fr);
+  column-gap:4px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px 10px 10px;
 }
-.tl-row{
-  display:flex;gap:14px;padding:9px 14px;background:var(--card);
-  border:1px solid var(--line);border-radius:10px;margin-bottom:5px;font-size:14px;
+.tl-bar{
+  position:relative;margin:4px 3px;border-radius:9px;background:var(--c);
+  display:flex;justify-content:center;align-items:flex-start;overflow:hidden;min-height:18px;z-index:1;
 }
-.tl-year{flex:none;width:118px;font-weight:700;color:var(--accent);font-size:13.5px}
-.tl-txt{flex:1;min-width:0}
+.tl-bar span{
+  writing-mode:vertical-rl;color:#fff;font-size:11px;font-weight:700;letter-spacing:1px;
+  padding:6px 0;white-space:nowrap;line-height:1;
+}
+.tl-bar.from-before{border-top-left-radius:0;border-top-right-radius:0;margin-top:0;
+  background:linear-gradient(to bottom,color-mix(in srgb,var(--c) 35%,transparent),var(--c) 36px)}
+.tl-bar.to-after{border-bottom-left-radius:0;border-bottom-right-radius:0;margin-bottom:0;
+  background:linear-gradient(to top,color-mix(in srgb,var(--c) 35%,transparent),var(--c) 36px)}
+.tl-bar.from-before.to-after{background:linear-gradient(to bottom,color-mix(in srgb,var(--c) 35%,transparent),var(--c) 36px,var(--c) calc(100% - 36px),color-mix(in srgb,var(--c) 35%,transparent))}
+.tl-year{
+  position:relative;padding:12px 14px 12px 0;text-align:right;font-size:13px;color:var(--accent);
+  border-right:2px solid #e6d3d6;
+}
+.tl-year::after{
+  content:"";position:absolute;right:-7px;top:16px;width:12px;height:12px;border-radius:50%;
+  background:#fff;border:3px solid var(--accent);box-sizing:border-box;
+}
+.tl-cell{padding:5px 0 5px 14px;min-width:0}
+.tl-body{border-radius:10px;padding:7px 10px}
+.tl-body.multi{background:#faf7f6;box-shadow:inset 3px 0 0 var(--accent)}
+.tl-body.pivot{background:#fff8db;box-shadow:inset 3px 0 0 #e0a33a}
+.tl-items{margin:0;padding-left:16px;font-size:14px;line-height:1.65}
+.tl-items li{margin:1px 0}
+.tl-same{font-size:11px;font-weight:700;color:var(--accent);margin-bottom:2px}
+.tl-chips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:5px}
+.tl-chip{font-size:11px;font-weight:700;padding:1px 8px;border-radius:99px;line-height:1.7;
+  border:1.5px solid var(--c);color:var(--c);background:#fff}
+.tl-chip.start{background:var(--c);color:#fff}
+.tl-chip small{font-weight:500;opacity:.85}
+.tl-note{margin:5px 0 0;font-size:12.5px;color:#7a6a3a}
+.tl-note::before{content:"포인트 · ";font-weight:700;color:#b08900}
+.tl-flat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:6px 12px}
+.tl-flat-row{display:grid;grid-template-columns:92px minmax(0,1fr);column-gap:4px}
+.tl-flat-row .tl-body{margin:5px 0 5px 14px}
 @media(max-width:560px){
-  .tl-row{flex-direction:column;gap:2px}
-  .tl-year{width:auto}
+  .tl-grid{--lane-w:12px;--year-w:64px;padding:8px 8px 8px 6px;column-gap:2px}
+  .tl-bar{margin:4px 2px;border-radius:6px}
+  .tl-bar span{display:none}
+  .tl-year{padding-right:10px;font-size:12px}
+  .tl-cell{padding-left:10px}
+  .tl-body{padding:6px 8px}
+  .tl-items{font-size:13.5px}
+  .tl-flat-row{grid-template-columns:64px minmax(0,1fr)}
 }
 
 .foot{text-align:center;padding:24px;color:var(--ink-soft);font-size:12px;border-top:1px solid var(--line)}
