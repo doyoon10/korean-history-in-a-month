@@ -127,6 +127,7 @@
     var isDone = !!S.done[p.day];
     var note = scheduleNote(p);
     var nDay = countFor(dayFilter(p)), nAll = countFor(learnedFilter(p));
+    var uDay = countUnseen(dayFilter(p)), uAll = countUnseen(learnedFilter(p));
     box.innerHTML =
       '<div class="today-day">DAY ' + p.day + " · " + p.date + " · 권장 " + esc(p.time) + "</div>" +
       '<div class="today-title">' + esc(p.title) + "</div>" +
@@ -135,8 +136,8 @@
       '<div class="today-actions">' +
       '<button class="mini' + (isDone ? " active" : "") + '" id="today-done">' + (isDone ? "완료함" : "완료 표시") + "</button>" +
       (p.concepts.length ? '<button class="mini" id="today-concept">개념 보기</button>' : "") +
-      (p.concepts.length ? '<button class="mini" id="today-quiz">오늘 범위 문제 ' + nDay + "</button>" : "") +
-      '<button class="mini" id="today-learned">배운 범위 누적 ' + nAll + "</button>" +
+      (p.concepts.length ? '<button class="mini" id="today-quiz">오늘 범위 문제 ' + nDay + " <small>새 " + uDay + "</small></button>" : "") +
+      '<button class="mini" id="today-learned">배운 범위 누적 ' + nAll + " <small>새 " + uAll + "</small></button>" +
       "</div>";
 
     $("#today-done").addEventListener("click", function () {
@@ -434,16 +435,33 @@
       if (eras.indexOf("all") !== -1) return true;
       return eras.indexOf(q.era) !== -1;
     });
-    pool = shuffle(pool);
+    // 안 푼 문제를 먼저, 그다음 틀렸던 문제, 마지막으로 이미 맞힌 문제
+    var wrongIds = {};
+    S.wrong.forEach(function (w) { wrongIds[w.id] = true; });
+    var fresh = [], wrong = [], done = [];
+    pool.forEach(function (q) {
+      if (!S.seen[q.id]) fresh.push(q);
+      else if (wrongIds[q.id]) wrong.push(q);
+      else done.push(q);
+    });
+    pool = shuffle(fresh).concat(shuffle(wrong), shuffle(done));
     return n > 0 ? pool.slice(0, n) : pool;
+  }
+  function countUnseen(filter) {
+    return pickQuestions(filter, 0).filter(function (q) { return !S.seen[q.id]; }).length;
+  }
+  function questionStatus(q) {
+    if (!S.seen[q.id]) return "fresh";
+    return S.wrong.some(function (w) { return w.id === q.id; }) ? "wrong" : "again";
   }
 
   function startQuizFor(filter, n, mode) {
     var list = pickQuestions(filter, n);
     if (!list.length) { alert("해당 범위의 문제가 없습니다."); return; }
-    run = { list: list, i: 0, answers: [], mode: mode || "study", filter: filter, n: n };
+    run = { list: list, i: 0, answers: [], mode: mode || "study", filter: filter, n: n,
+      status: list.map(questionStatus) };
     showView("quiz");
-    $("#quiz-setup").classList.add("hidden");
+    $("#quiz-setup").classList.add("hidden"); $("#quiz-official").classList.add("hidden");
     $("#quiz-result").classList.add("hidden");
     $("#quiz-run").classList.remove("hidden");
     renderQuestion();
@@ -461,7 +479,10 @@
       '<div class="q-card">' +
       '<div class="q-meta"><span class="q-tag">' + esc(ERA_NAMES[q.era] || q.era) + "</span>" +
       '<span class="q-tag">' + esc(q.topic) + "</span>" +
-      '<span class="q-tag diff">난이도 ' + q.diff + "/5</span></div>" +
+      '<span class="q-tag diff">난이도 ' + q.diff + "/5</span>" +
+      (run.status ? '<span class="q-tag st-' + run.status[run.i] + '">' +
+        { fresh: "처음 푸는 문제", wrong: "틀렸던 문제", again: "다시 푸는 문제" }[run.status[run.i]] + "</span>" : "") +
+      "</div>" +
       '<div class="q-stem">' + esc(q.stem) + "</div>" +
       '<div class="q-choices">';
 
@@ -547,6 +568,11 @@
       : score >= 60 ? "3급 합격선입니다. 오답 노트를 두 번 돌면 확실해집니다."
       : "개념 탭에서 해당 시대를 다시 읽고 같은 범위를 한 번 더 푸세요.";
 
+    if (run.filter) {
+      var left = countUnseen(run.filter);
+      msg += left ? " 이 범위에 아직 안 푼 문제가 " + left + "개 남았습니다. 같은 범위 다시를 누르면 그 문제부터 나옵니다."
+                  : " 이 범위의 문제를 모두 한 번씩 풀었습니다. 이제 틀렸던 문제부터 다시 나옵니다.";
+    }
     if (run.n > 0 && total < run.n) {
       msg += " 이 범위에 준비된 문제는 " + total + "개입니다. 대시보드의 배운 범위 누적으로 더 풀 수 있습니다.";
     }
@@ -588,7 +614,7 @@
     $("#res-wrong").addEventListener("click", function () { showView("wrong"); });
     $("#res-home").addEventListener("click", function () {
       $("#quiz-result").classList.add("hidden");
-      $("#quiz-setup").classList.remove("hidden");
+      $("#quiz-setup").classList.remove("hidden"); $("#quiz-official").classList.remove("hidden");
     });
   }
 
@@ -622,9 +648,11 @@
     $("#wrong-retry").addEventListener("click", function () {
       var list = S.wrong.map(function (w) { return qById(w.id); }).filter(Boolean);
       if (!list.length) { alert("오답 노트가 비어 있습니다."); return; }
-      run = { list: shuffle(list), i: 0, answers: [], mode: "study", retryWrong: true, n: 0 };
+      list = shuffle(list);
+      run = { list: list, i: 0, answers: [], mode: "study", retryWrong: true, n: 0,
+        status: list.map(function () { return "wrong"; }) };
       showView("quiz");
-      $("#quiz-setup").classList.add("hidden");
+      $("#quiz-setup").classList.add("hidden"); $("#quiz-official").classList.add("hidden");
       $("#quiz-result").classList.add("hidden");
       $("#quiz-run").classList.remove("hidden");
       renderQuestion();
