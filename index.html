@@ -16,7 +16,13 @@
 <header class="topbar">
   <div class="topbar-inner">
     <div class="brand">
-      <span class="brand-mark">韓</span>
+      <span class="brand-mark" role="img" aria-label="한달 한국사 로고">
+        <svg viewBox="0 0 64 64" aria-hidden="true">
+          <rect width="64" height="64" rx="14" class="logo-bg"/>
+          <circle cx="32" cy="32" r="18" class="logo-gold"/>
+          <path d="M 14,32 A 9,9 0 0 1 32,32 A 9,9 0 0 0 50,32 A 18,18 0 0 0 14,32 Z" class="logo-cream"/>
+        </svg>
+      </span>
       <div>
         <div class="brand-title">한달 한국사</div>
         <div class="brand-sub">Korean History in a Month · 심화 대비 31일 플랜</div>
@@ -170,7 +176,7 @@
   <section class="view" id="view-timeline">
     <div class="view-head">
       <h1>연표 · 타임라인</h1>
-      <p>시간은 왼쪽에서 오른쪽으로 흐릅니다. 위의 색 막대는 이어진 기간이고, 아래 카드는 그해의 사건입니다. 노란 카드는 한 시대가 끝나고 다음 시대가 시작되는 전환점입니다.</p>
+      <p>시간은 왼쪽에서 오른쪽으로 흐릅니다.</p>
     </div>
     <div class="search-row">
       <input type="search" id="tl-search" placeholder="검색 (예: 1270, 무신 정권, 만적)">
@@ -182,7 +188,10 @@
 </main>
 
 <footer class="foot">
-  <p>학습 기록은 이 브라우저에만 저장됩니다. 시험 준비 화이팅.</p>
+  <p>
+    학습 기록은 브라우저에만 저장됩니다. <br>
+    문의: 26_07@bssm.hs.kr <br>
+  </p>
 </footer>
 
 <script src="js/data/concepts_1.js"></script>
