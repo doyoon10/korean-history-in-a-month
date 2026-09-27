@@ -636,7 +636,7 @@
   }
 
   // ---------- 연표 (타임라인) ----------
-  var TL_COLORS = { red: "#c92a2a", blue: "#2f5cd4", green: "#2f9e44", orange: "#e8590c", brown: "#8b5a2b", gray: "#6b7280" };
+  var TL_COLORS = { red: "var(--tl-red)", blue: "var(--tl-blue)", green: "var(--tl-green)", orange: "var(--tl-orange)", brown: "var(--tl-brown)", gray: "var(--tl-gray)" };
   function tlColor(c) { return TL_COLORS[c] || TL_COLORS.gray; }
   function yearText(y) { return y < 0 ? "BC " + (-y) : String(y); }
 
@@ -694,30 +694,63 @@
       "</div>";
   }
 
-  // 가로 타임라인: 열 = 사건, 위쪽 줄 = 기간 막대, 가운데 = 연도 축, 아래 = 사건 카드
-  function renderTimelineGroup(g, gi) {
-    var L = layoutGroup(g);
-    var n = L.rows.length;
-    var html = '<section class="tl-group" id="tl-g' + gi + '">' +
-      '<div class="tl-head"><div><h2>' + esc(g.g) + '</h2><span class="tl-range">' +
-      yearText(L.rows[0].y) + " ~ " + yearText(L.rows[n - 1].y) + " · 사건 " + n + "칸 · 기간 " + L.bars.length + "개</span></div>" +
-      '<div class="tl-nav"><button class="tl-arrow" data-dir="-1" data-g="' + gi + '" aria-label="이전">&#8249;</button>' +
-      '<button class="tl-arrow" data-dir="1" data-g="' + gi + '" aria-label="다음">&#8250;</button></div></div>' +
-      '<div class="tl-scroll" id="tl-s' + gi + '"><div class="tl-track" style="--cols:' + n + ";--lanes:" + L.lanes + '">';
+  // 모든 시대를 하나로 합친다. 같은 해의 사건은 한 칸으로 모으고, 시대 구간을 따로 기록한다
+  function mergedTimeline() {
+    var byY = {}, periods = [], eras = [];
+    (window.TIMELINE || []).forEach(function (g) {
+      g.rows.forEach(function (r) {
+        var m = byY[r.y];
+        if (!m) byY[r.y] = { y: r.y, label: r.label, items: r.items.slice(), note: r.note || "" };
+        else {
+          r.items.forEach(function (it) { if (m.items.indexOf(it) === -1) m.items.push(it); });
+          if (r.note) m.note = m.note ? m.note + " · " + r.note : r.note;
+        }
+      });
+      periods = periods.concat(g.periods);
+    });
+    var rows = Object.keys(byY).map(function (k) { return byY[k]; }).sort(function (x, y) { return x.y - y.y; });
+    (window.TIMELINE || []).forEach(function (g, gi) {
+      var ys = g.rows.map(function (r) { return r.y; });
+      var lo = Math.min.apply(null, ys), hi = Math.max.apply(null, ys), s = -1, en = -1;
+      rows.forEach(function (r, i) { if (r.y >= lo && r.y <= hi) { if (s === -1) s = i; en = i; } });
+      eras.push({ g: g.g, s: s, e: en, i: gi });
+    });
+    // 시대 구간이 서로 겹치지 않게 앞 시대가 뒤 시대 시작 전에 끝나도록 자른다
+    eras.forEach(function (er, k) { if (k > 0 && er.s <= eras[k - 1].e) er.s = eras[k - 1].e + 1; });
+    return { g: "전체", rows: rows, periods: periods, eras: eras };
+  }
+
+  function renderTimelineAll() {
+    var M = mergedTimeline();
+    var L = layoutGroup(M);
+    var n = L.rows.length, ER = L.lanes + 1;
+    var html = '<section class="tl-group tl-all">' +
+      '<div class="tl-head"><div><h2>한국사 전체 타임라인</h2><span class="tl-range">' +
+      yearText(L.rows[0].y) + " ~ " + yearText(L.rows[n - 1].y) + " · 사건 " + n + "칸 · 기간 " + L.bars.length + "개 · 옆으로 넘겨 보세요</span></div>" +
+      '<div class="tl-nav"><button class="tl-arrow" data-dir="-1" aria-label="이전">&#8249;</button>' +
+      '<button class="tl-arrow" data-dir="1" aria-label="다음">&#8250;</button></div></div>' +
+      '<div class="tl-scroll" id="tl-scroll"><div class="tl-track" style="--cols:' + n + ";--lanes:" + L.lanes + '">';
+    M.eras.forEach(function (er, k) {
+      if (er.s < 0 || er.e < er.s) return;
+      html += '<div class="tl-era' + (k % 2 ? " alt" : "") + '" style="grid-row:1;grid-column:' + (er.s + 1) + " / " + (er.e + 2) + '">' +
+        '<span class="tl-era-label">' + esc(er.g) + "</span></div>";
+    });
     L.bars.forEach(function (b) {
       html += '<div class="tl-bar' + (b.fromBefore ? " from-before" : "") + (b.toAfter ? " to-after" : "") +
-        '" style="grid-row:' + (b.lane + 1) + ";grid-column:" + (b.s + 1) + " / " + (b.e + 2) + ";--c:" + tlColor(b.p.c) +
+        '" style="grid-row:' + (b.lane + 2) + ";grid-column:" + (b.s + 1) + " / " + (b.e + 2) + ";--c:" + tlColor(b.p.c) +
         '" title="' + esc(b.p.n + " " + yearText(b.p.f) + "~" + yearText(b.p.t)) + '">' +
         '<span class="tl-bar-label"><b>' + esc(b.p.n) + "</b><small>" + yearText(b.p.f) + "~" + yearText(b.p.t) + "</small></span></div>";
     });
     L.rows.forEach(function (r, i) {
-      html += '<div class="tl-tick" style="grid-row:' + (L.lanes + 1) + ";grid-column:" + (i + 1) + '"><span>' + esc(r.label) + "</span></div>" +
-        '<div class="tl-cell" style="grid-row:' + (L.lanes + 2) + ";grid-column:" + (i + 1) + '">' + cardHtml(r, L.chips[i], false) + "</div>";
+      html += '<div class="tl-tick" data-col="' + i + '" style="grid-row:' + (ER + 1) + ";grid-column:" + (i + 1) + '"><span>' + esc(r.label) + "</span></div>" +
+        '<div class="tl-cell" style="grid-row:' + (ER + 2) + ";grid-column:" + (i + 1) + '">' + cardHtml(r, L.chips[i], false) + "</div>";
     });
+    tlEras = M.eras;
     return html + "</div></div></section>";
   }
+  var tlEras = [];
 
-  // 검색: 사건·설명에 걸리는 행 + 이름이 걸리는 기간 안의 모든 행
+  // 검색: 사건·설명에 걸리는 행 + 이름이 걸리는 기간 안의 모든 행 (시대별 목록)
   function renderTimelineSearch(q) {
     var html = "";
     (window.TIMELINE || []).forEach(function (g) {
@@ -741,32 +774,66 @@
 
   function renderTimeline() {
     var q = $("#tl-search").value.trim().toLowerCase();
-    var groups = window.TIMELINE || [];
-    $("#tl-jump").innerHTML = q ? "" : groups.map(function (g, i) {
+    var html = q ? renderTimelineSearch(q) : renderTimelineAll();
+    $("#tl-jump").innerHTML = q ? "" : (window.TIMELINE || []).map(function (g, i) {
       return '<button class="mini" data-jump="' + i + '">' + esc(g.g) + "</button>";
     }).join("");
-    var html = q ? renderTimelineSearch(q) : groups.map(renderTimelineGroup).join("");
     $("#timeline-list").innerHTML = html || '<p class="empty">검색 결과가 없습니다.</p>';
+    if (!q) markActiveEra();
   }
 
-  function scrollTrack(gi, dir) {
-    var el = document.getElementById("tl-s" + gi);
-    if (el) el.scrollBy({ left: dir * el.clientWidth * 0.8, behavior: "smooth" });
+  function tlScroller() { return document.getElementById("tl-scroll"); }
+  function colLeft(i) {
+    var t = document.querySelector('.tl-tick[data-col="' + i + '"]');
+    return t ? t.offsetLeft : 0;
+  }
+  // 지금 화면 왼쪽에 걸린 열이 속한 시대를 버튼에 표시
+  function markActiveEra() {
+    var sc = tlScroller(); if (!sc) return;
+    var first = document.querySelector('.tl-tick[data-col="0"]');
+    var w = first ? first.offsetWidth : 188;
+    var col = Math.round(sc.scrollLeft / w);
+    var cur = 0;
+    tlEras.forEach(function (er) { if (er.s >= 0 && col >= er.s) cur = er.i; });
+    var act = null;
+    $$("#tl-jump [data-jump]").forEach(function (b) {
+      var on = +b.dataset.jump === cur;
+      b.classList.toggle("active", on);
+      if (on) act = b;
+    });
+    // 현재 시대 버튼이 버튼 줄 밖에 있으면 보이는 곳으로 당겨온다
+    var bar = $("#tl-jump");
+    if (act && bar) {
+      var l = act.offsetLeft, r = l + act.offsetWidth;
+      if (l < bar.scrollLeft) bar.scrollLeft = l - 8;
+      else if (r > bar.scrollLeft + bar.clientWidth) bar.scrollLeft = r - bar.clientWidth + 8;
+    }
   }
 
   function initTimeline() {
     $("#tl-search").addEventListener("input", renderTimeline);
     $("#timeline-list").addEventListener("click", function (e) {
-      var b = e.target.closest(".tl-arrow");
-      if (b) scrollTrack(b.dataset.g, parseInt(b.dataset.dir, 10));
+      var b = e.target.closest(".tl-arrow"), sc = tlScroller();
+      if (b && sc) sc.scrollBy({ left: parseInt(b.dataset.dir, 10) * sc.clientWidth * 0.8, behavior: "smooth" });
     });
+    // 스크롤 중에는 80ms마다, 멈추면 한 번 더 현재 시대를 갱신
+    var lastMark = 0, trail = null;
+    $("#timeline-list").addEventListener("scroll", function (e) {
+      if (e.target.id !== "tl-scroll") return;
+      var now = Date.now();
+      if (now - lastMark > 80) { lastMark = now; markActiveEra(); }
+      clearTimeout(trail);
+      trail = setTimeout(markActiveEra, 120);
+    }, true);
     $("#tl-jump").addEventListener("click", function (e) {
-      var b = e.target.closest("[data-jump]");
-      var sec = b && document.getElementById("tl-g" + b.dataset.jump);
-      if (sec) window.scrollTo({ top: sec.getBoundingClientRect().top + window.scrollY - 120, behavior: "smooth" });
+      var b = e.target.closest("[data-jump]"), sc = tlScroller();
+      if (!b || !sc) return;
+      var er = tlEras[+b.dataset.jump];
+      if (er && er.s >= 0) sc.scrollTo({ left: colLeft(er.s), behavior: "smooth" });
     });
     renderTimeline();
   }
+
 
   // ---------- 테마 ----------
   function currentTheme() {
