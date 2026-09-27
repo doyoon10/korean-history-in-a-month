@@ -392,3 +392,38 @@ main{max-width:1040px;margin:0 auto;padding:24px 20px 60px}
 .tl-all .tl-scroll{padding-top:2px}
 #tl-jump{position:sticky;top:92px;z-index:5;background:var(--bg);padding-top:8px}
 @media(max-width:560px){ #tl-jump{top:84px} }
+
+/* ---------- theme transition ---------- */
+/* 배너 그라데이션 색도 서서히 바뀌도록 색 변수로 등록 */
+@property --hero-a{syntax:"<color>";inherits:true;initial-value:#8b1e2d}
+@property --hero-b{syntax:"<color>";inherits:true;initial-value:#5d1620}
+@property --hero-hl{syntax:"<color>";inherits:true;initial-value:#ffd9a0}
+@property --hero-stat{syntax:"<color>";inherits:true;initial-value:rgba(255,255,255,.12)}
+
+/* 대체 방식: 전환하는 동안에만 색 전환을 켠다 */
+html.theme-anim,
+html.theme-anim *,
+html.theme-anim *::before,
+html.theme-anim *::after{
+  transition:background-color .45s ease,color .45s ease,border-color .45s ease,box-shadow .45s ease,
+    --hero-a .45s ease,--hero-b .45s ease,--hero-hl .45s ease,--hero-stat .45s ease !important;
+}
+
+/* 기본 방식: 화면 전체를 겹쳐서 바꾼다 */
+::view-transition-old(root),
+::view-transition-new(root){animation-duration:.5s;animation-timing-function:cubic-bezier(.4,0,.2,1)}
+html.theme-vt::view-transition-old(root){animation-name:theme-fade-out}
+html.theme-vt::view-transition-new(root){animation-name:theme-fade-in}
+@keyframes theme-fade-out{from{opacity:1}to{opacity:0}}
+@keyframes theme-fade-in{from{opacity:0}to{opacity:1}}
+
+/* 버튼 아이콘 회전 */
+.theme-toggle{transition:border-color .2s ease,transform .2s ease}
+.theme-toggle:active{transform:scale(.92)}
+.theme-toggle.spin{animation:theme-spin .5s cubic-bezier(.4,0,.2,1)}
+@keyframes theme-spin{from{transform:rotate(-90deg) scale(.7);opacity:.3}to{transform:rotate(0) scale(1);opacity:1}}
+
+@media (prefers-reduced-motion: reduce){
+  .theme-toggle.spin{animation:none}
+  ::view-transition-old(root),::view-transition-new(root){animation:none}
+}

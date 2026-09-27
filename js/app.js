@@ -847,17 +847,54 @@
     b.textContent = dark ? "\u2600" : "\u263E";
     b.title = dark ? "라이트 모드로" : "다크 모드로";
   }
+  var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // 휴대폰 주소창 색도 테마에 맞춘다
+  function paintMetaColor() {
+    var m = document.querySelector('meta[name="theme-color"]');
+    if (m) m.setAttribute("content", currentTheme() === "dark" ? "#131416" : "#8b1e2d");
+  }
+
+  // 전환 효과: 최신 브라우저는 화면 전체를 부드럽게 겹쳐 바꾸고,
+  // 지원하지 않으면 색만 서서히 바꾼다. 움직임 줄이기 설정이면 즉시 바꾼다.
+  function withThemeTransition(change) {
+    var html = document.documentElement;
+    if (reduceMotion) { change(); return; }
+    if (document.startViewTransition && !document.hidden) {
+      html.classList.add("theme-vt");
+      var t = document.startViewTransition(change);
+      var done = function () { html.classList.remove("theme-vt"); };
+      // 빠르게 연달아 누르면 앞 전환이 취소되며 거부되는데, 색 변경 자체는 이미 끝났으므로 조용히 넘긴다
+      t.ready.catch(function () {});
+      t.finished.then(done, done);
+      return;
+    }
+    html.classList.add("theme-anim");
+    change();
+    setTimeout(function () { html.classList.remove("theme-anim"); }, 520);
+  }
+
   function initTheme() {
     paintThemeButton();
-    $("#theme-toggle").addEventListener("click", function () {
+    paintMetaColor();
+    var btn = $("#theme-toggle");
+    btn.addEventListener("click", function () {
       var next = currentTheme() === "dark" ? "light" : "dark";
-      document.documentElement.setAttribute("data-theme", next);
+      btn.classList.remove("spin"); void btn.offsetWidth; btn.classList.add("spin");
+      withThemeTransition(function () {
+        document.documentElement.setAttribute("data-theme", next);
+        paintThemeButton();
+        paintMetaColor();
+      });
       try { localStorage.setItem("hanneung_theme", next); } catch (e) {}
-      paintThemeButton();
     });
     if (window.matchMedia) {
       var mq = window.matchMedia("(prefers-color-scheme: dark)");
-      if (mq.addEventListener) mq.addEventListener("change", paintThemeButton);
+      var onSystem = function () {
+        if (document.documentElement.getAttribute("data-theme")) return; // 직접 고른 경우는 그대로
+        withThemeTransition(function () { paintThemeButton(); paintMetaColor(); });
+      };
+      if (mq.addEventListener) mq.addEventListener("change", onSystem);
     }
   }
 
