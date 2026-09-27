@@ -27,6 +27,99 @@
   }
   // **굵게** 만 마크업 허용
   function fmt(s) { return esc(s).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>"); }
+
+  // ---------- 용어 풀이 ----------
+  var GLOSS = window.GLOSSARY || {};
+  var glossRe = (function () {
+    var keys = Object.keys(GLOSS).filter(function (k) { return k.length >= 2; });
+    if (!keys.length) return null;
+    keys.sort(function (a, b) { return b.length - a.length; });
+    return new RegExp(keys.map(function (k) { return esc(k).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }).join("|"), "g");
+  })();
+
+  // 시대별 풀이가 따로 있으면 그 시대 것만 쓴다
+  function glossFor(term, era) {
+    var v = GLOSS[term];
+    if (!v) return null;
+    if (typeof v === "string") return v;
+    return v[era] || v["*"] || null;
+  }
+
+  // fmt()를 거친 HTML에서 용어를 찾아 풀이 표시를 붙인다. seen에 있는 용어는 건너뛴다(주제당 한 번)
+  function linkTerms(html, era, seen) {
+    if (!glossRe) return html;
+    return html.split(/(<[^>]+>)/).map(function (seg) {
+      if (seg.charAt(0) === "<") return seg;
+      return seg.replace(glossRe, function (m, at, str) {
+        // '불국사'의 '국사'처럼 단어 중간에서 걸린 경우는 제외
+        if (/[가-힣0-9]/.test(str.charAt(at - 1))) return m;
+        if (seen[m] || !glossFor(m, era)) return m;
+        seen[m] = 1;
+        return '<span class="term" tabindex="0" data-term="' + m + '" data-era="' + era + '">' + m + "</span>";
+      });
+    }).join("");
+  }
+
+  // 괄호 밖의 " / "를 기준으로 한 줄씩 나눈다
+  function splitSlash(s) {
+    var out = [], depth = 0, start = 0;
+    for (var i = 0; i < s.length; i++) {
+      var c = s.charAt(i);
+      if (c === "(" || c === "[") depth++;
+      else if (c === ")" || c === "]") depth--;
+      else if (depth === 0 && s.substr(i, 3) === " / ") { out.push(s.slice(start, i)); start = i + 3; i += 2; }
+    }
+    out.push(s.slice(start));
+    return out;
+  }
+
+  function initGlossary() {
+    var pop = document.createElement("div");
+    pop.id = "gloss-pop";
+    pop.setAttribute("role", "tooltip");
+    pop.hidden = true;
+    document.body.appendChild(pop);
+    var cur = null;
+
+    function show(el) {
+      var def = glossFor(el.dataset.term, el.dataset.era);
+      if (!def) return;
+      cur = el;
+      pop.innerHTML = "<b>" + esc(el.dataset.term) + "</b>" + esc(def);
+      pop.style.left = "0px";
+      pop.style.top = "0px";
+      pop.hidden = false;
+      var r = el.getBoundingClientRect();
+      var w = pop.offsetWidth, h = pop.offsetHeight;
+      var vw = document.documentElement.clientWidth;
+      var left = Math.max(8, Math.min(r.left + r.width / 2 - w / 2, vw - w - 8));
+      var top = r.bottom + 8;
+      if (top + h > window.innerHeight - 8 && r.top - h - 8 > 0) top = r.top - h - 8;
+      pop.style.left = left + "px";
+      pop.style.top = top + "px";
+    }
+    function hide() { cur = null; pop.hidden = true; }
+
+    document.addEventListener("mouseover", function (e) {
+      var t = e.target.closest && e.target.closest(".term");
+      if (t && t !== cur) show(t);
+      else if (!t && cur) hide();
+    });
+    document.addEventListener("focusin", function (e) {
+      if (e.target.classList && e.target.classList.contains("term")) show(e.target);
+    });
+    document.addEventListener("focusout", function (e) {
+      if (e.target === cur) hide();
+    });
+    // 터치 기기: 탭으로 열고 다른 곳을 탭하면 닫기
+    document.addEventListener("click", function (e) {
+      var t = e.target.closest && e.target.closest(".term");
+      if (t) show(t);
+      else if (cur) hide();
+    }, true);
+    window.addEventListener("scroll", hide, { passive: true });
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape") hide(); });
+  }
   function shuffle(a) {
     a = a.slice();
     for (var i = a.length - 1; i > 0; i--) {
@@ -344,14 +437,19 @@
         '<span class="era-ratio">약 ' + era.ratio + "문항</span></h3>";
       topics.forEach(function (t) {
         var open = q || (openIds && openIds.indexOf(t.id) !== -1);
+        var seen = {};
         html +=
           '<div class="topic' + (open ? " open" : "") + '" id="topic-' + t.id + '">' +
           '<div class="topic-head"><span class="topic-arrow">▶</span><h3>' + esc(t.title) + "</h3></div>" +
-          '<div class="topic-body"><ul>' +
-          t.points.map(function (p) { return "<li>" + fmt(p) + "</li>"; }).join("") +
+          '<div class="topic-body"><ul class="points">' +
+          t.points.map(function (p) {
+            return "<li>" + splitSlash(p).map(function (line) {
+              return '<span class="pt-line">' + linkTerms(fmt(line), era.id, seen) + "</span>";
+            }).join("") + "</li>";
+          }).join("") +
           '</ul><div class="kw-row">' +
-          t.keywords.map(function (k) { return '<span class="kw">' + esc(k) + "</span>"; }).join("") +
-          '</div><div class="tip">' + fmt(t.tip) + "</div></div></div>";
+          t.keywords.map(function (k) { return '<span class="kw">' + linkTerms(esc(k), era.id, {}) + "</span>"; }).join("") +
+          '</div><div class="tip">' + linkTerms(fmt(t.tip), era.id, seen) + "</div></div></div>";
       });
       html += "</div>";
     });
@@ -501,7 +599,7 @@
       var ok = picked === q.answer;
       html += '<div class="explain"><div class="ex-head ' + (ok ? "ok" : "no") + '">' +
         (ok ? "정답입니다" : "오답입니다 · 정답 " + (q.answer + 1) + "번") + "</div>" +
-        esc(q.explain) + '<div class="ex-kw">핵심어 · ' + esc(q.keyword) + "</div></div>";
+        linkTerms(esc(q.explain), q.era, {}) + '<div class="ex-kw">핵심어 · ' + esc(q.keyword) + "</div></div>";
     }
 
     html += '<div class="q-nav">' +
@@ -598,7 +696,7 @@
           return '<div class="wrong-item"><div class="wrong-stem">' + esc(w.q.stem) + "</div>" +
             '<div class="wrong-ans">정답 ' + (w.q.answer + 1) + "번 · " + esc(w.q.choices[w.q.answer]) + "</div>" +
             (w.mine !== undefined ? '<div class="wrong-mine">내 답 ' + (w.mine + 1) + "번 · " + esc(w.q.choices[w.mine]) + "</div>" : '<div class="wrong-mine">무응답</div>') +
-            '<div class="wrong-ex">' + esc(w.q.explain) + "</div></div>";
+            '<div class="wrong-ex">' + linkTerms(esc(w.q.explain), w.q.era, {}) + "</div></div>";
         }).join("") + "</div>";
     }
 
@@ -640,7 +738,7 @@
         '<div class="wrong-stem">' + esc(q.stem) + "</div>" +
         '<div class="wrong-ans">정답 ' + (q.answer + 1) + "번 · " + esc(q.choices[q.answer]) + "</div>" +
         '<div class="wrong-mine">내 답 ' + (w.mine + 1) + "번 · " + esc(q.choices[w.mine]) + "</div>" +
-        '<div class="wrong-ex">' + esc(q.explain) + '<div class="ex-kw" style="margin-top:6px;font-size:12px">핵심어 · ' + esc(q.keyword) + "</div></div></div>";
+        '<div class="wrong-ex">' + linkTerms(esc(q.explain), q.era, {}) + '<div class="ex-kw" style="margin-top:6px;font-size:12px">핵심어 · ' + esc(q.keyword) + "</div></div></div>";
     }).join("");
   }
 
@@ -928,6 +1026,7 @@
 
   // ---------- 시작 ----------
   initTheme();
+  initGlossary();
   initTabs();
   initConcept();
   initQuiz();
