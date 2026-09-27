@@ -1,7 +1,7 @@
 # 한달 한국사 · Korean History in a Month
 
 > A 31-day study site for the Korean History Proficiency Test, level 심화.
-> Concepts, 130 past-exam-style questions, and a day-by-day plan. No build step, no dependencies.
+> Concepts, 542 original practice questions in the style of past exams, and a day-by-day plan. No build step, no dependencies.
 
 2026년 10월 17일 한국사능력검정시험 심화 대비용 학습 사이트입니다.
 1년 전 조금 공부해 본 상태에서 한 달 만에 심화 1급(80점), 최소 3급(60점)을 목표로 구성했습니다.
@@ -36,7 +36,7 @@ python3 -m http.server 8777
 | 대시보드 | D-day, 오늘 할 일, 진도율, 시대별 정답률, 합격 전략 |
 | 학습 플랜 | 31일 일자별 계획. 1급 코스(31일)와 3급 코스(★ 23일) 전환 가능 |
 | 개념 정리 | 11개 시대 56개 주제. 굵은 글씨가 시험에 그대로 나오는 부분 |
-| 기출 문제 | 130문항 5지선다. 범위·문항수 선택, 학습 모드와 실전 모드 |
+| 기출 문제 | 기출 유형 542문항 5지선다. 안 푼 문제부터 출제, 학습 모드와 실전 모드 |
 | 오답 노트 | 틀린 문제 자동 저장, 오답만 다시 풀기 |
 | 연표·암기 | 순서 나열 문제 대비 핵심 연표 약 200개 |
 
@@ -47,6 +47,10 @@ python3 -m http.server 8777
 3. "오늘 범위 문제 풀기"로 10문항을 풉니다. 학습 모드는 답을 고르면 바로 해설이 나옵니다.
 4. 플랜에서 그날을 체크하면 진도율에 반영됩니다.
 5. 시험 전 5일은 새 개념 대신 오답 노트와 실전 모드만 반복합니다.
+
+## 문제 출처
+
+문제는 모두 실제 출제 방식에 맞춰 새로 만든 연습 문제입니다. 공식 기출문제는 국사편찬위원회 자료로 공공누리 제4유형(출처표시, 상업적 이용금지, 변경금지)이라 원문을 옮기지 않았습니다. 기출문제는 [한국사능력검정시험 홈페이지](https://www.historyexam.go.kr/)의 시험자료실에서 받을 수 있습니다.
 
 ## 배점 참고
 
