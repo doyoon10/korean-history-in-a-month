@@ -184,7 +184,7 @@
     var html = eras.map(function (e) {
       var st = S.stats[e.id] || { ok: 0, n: 0 };
       var pct = st.n ? Math.round(st.ok / st.n * 100) : 0;
-      var color = st.n === 0 ? "var(--ink-soft)" : pct >= 80 ? "var(--green)" : pct >= 60 ? "var(--orange)" : "#c92a2a";
+      var color = st.n === 0 ? "var(--ink-soft)" : pct >= 80 ? "var(--green)" : pct >= 60 ? "var(--orange)" : "var(--bad)";
       return '<div class="acc-item"><div class="acc-name">' + esc(e.short) + "</div>" +
         '<div class="acc-num" style="color:' + color + '">' + (st.n ? pct + "%" : "-") +
         " <small>" + st.ok + "/" + st.n + "</small></div>" +
@@ -675,35 +675,46 @@
       (ch.y !== null ? " <small>" + yearText(ch.y) + "</small>" : "") + "</span>";
   }
 
-  function rowBodyHtml(r, chips) {
+  // "사건: 설명" 형식이면 제목과 설명을 나눠 보여준다
+  function itemHtml(t) {
+    var k = t.indexOf(": ");
+    if (k === -1) return "<li><b>" + esc(t) + "</b></li>";
+    return "<li><b>" + esc(t.slice(0, k)) + "</b><span>" + esc(t.slice(k + 2)) + "</span></li>";
+  }
+
+  function cardHtml(r, chips, withYear) {
     var pivot = chips.some(function (c) { return c.kind === "end"; }) && chips.some(function (c) { return c.kind === "start"; });
     var multi = r.items.length > 1;
-    return '<div class="tl-body' + (multi ? " multi" : "") + (pivot ? " pivot" : "") + '">' +
+    return '<div class="tl-card' + (multi ? " multi" : "") + (pivot ? " pivot" : "") + '">' +
+      (withYear ? '<div class="tl-card-year">' + esc(r.label) + "</div>" : "") +
+      (pivot ? '<div class="tl-tag pivot">전환점</div>' : multi ? '<div class="tl-tag">같은 해 ' + r.items.length + "건</div>" : "") +
       (chips.length ? '<div class="tl-chips">' + chips.map(chipHtml).join("") + "</div>" : "") +
-      (multi ? '<div class="tl-same">같은 해 ' + r.items.length + "건</div>" : "") +
-      '<ul class="tl-items">' + r.items.map(function (t) { return "<li>" + esc(t) + "</li>"; }).join("") + "</ul>" +
+      '<ul class="tl-items">' + r.items.map(itemHtml).join("") + "</ul>" +
       (r.note ? '<p class="tl-note">' + esc(r.note) + "</p>" : "") +
       "</div>";
   }
 
-  function renderTimelineGroup(g) {
+  // 가로 타임라인: 열 = 사건, 위쪽 줄 = 기간 막대, 가운데 = 연도 축, 아래 = 사건 카드
+  function renderTimelineGroup(g, gi) {
     var L = layoutGroup(g);
-    var legend = L.bars.slice().sort(function (a, b) { return a.lane - b.lane || a.s - b.s; }).map(function (b) {
-      return '<span class="tl-leg"><i style="background:' + tlColor(b.p.c) + '"></i>' + esc(b.p.n) +
-        " <small>" + yearText(b.p.f) + "~" + yearText(b.p.t) + "</small></span>";
-    }).join("");
-    var html = '<div class="tl-group"><h2>' + esc(g.g) + '</h2><div class="tl-legend">' + legend + "</div>" +
-      '<div class="tl-grid" style="--lanes:' + L.lanes + '">';
+    var n = L.rows.length;
+    var html = '<section class="tl-group" id="tl-g' + gi + '">' +
+      '<div class="tl-head"><div><h2>' + esc(g.g) + '</h2><span class="tl-range">' +
+      yearText(L.rows[0].y) + " ~ " + yearText(L.rows[n - 1].y) + " · 사건 " + n + "칸 · 기간 " + L.bars.length + "개</span></div>" +
+      '<div class="tl-nav"><button class="tl-arrow" data-dir="-1" data-g="' + gi + '" aria-label="이전">&#8249;</button>' +
+      '<button class="tl-arrow" data-dir="1" data-g="' + gi + '" aria-label="다음">&#8250;</button></div></div>' +
+      '<div class="tl-scroll" id="tl-s' + gi + '"><div class="tl-track" style="--cols:' + n + ";--lanes:" + L.lanes + '">';
     L.bars.forEach(function (b) {
       html += '<div class="tl-bar' + (b.fromBefore ? " from-before" : "") + (b.toAfter ? " to-after" : "") +
-        '" style="grid-column:' + (b.lane + 1) + ";grid-row:" + (b.s + 1) + " / " + (b.e + 2) + ";--c:" + tlColor(b.p.c) +
-        '" title="' + esc(b.p.n + " " + yearText(b.p.f) + "~" + yearText(b.p.t)) + '"><span>' + esc(b.p.n) + "</span></div>";
+        '" style="grid-row:' + (b.lane + 1) + ";grid-column:" + (b.s + 1) + " / " + (b.e + 2) + ";--c:" + tlColor(b.p.c) +
+        '" title="' + esc(b.p.n + " " + yearText(b.p.f) + "~" + yearText(b.p.t)) + '">' +
+        '<span class="tl-bar-label"><b>' + esc(b.p.n) + "</b><small>" + yearText(b.p.f) + "~" + yearText(b.p.t) + "</small></span></div>";
     });
     L.rows.forEach(function (r, i) {
-      html += '<div class="tl-year" style="grid-column:' + (L.lanes + 1) + ";grid-row:" + (i + 1) + '"><b>' + esc(r.label) + "</b></div>" +
-        '<div class="tl-cell" style="grid-column:' + (L.lanes + 2) + ";grid-row:" + (i + 1) + '">' + rowBodyHtml(r, L.chips[i]) + "</div>";
+      html += '<div class="tl-tick" style="grid-row:' + (L.lanes + 1) + ";grid-column:" + (i + 1) + '"><span>' + esc(r.label) + "</span></div>" +
+        '<div class="tl-cell" style="grid-row:' + (L.lanes + 2) + ";grid-column:" + (i + 1) + '">' + cardHtml(r, L.chips[i], false) + "</div>";
     });
-    return html + "</div></div>";
+    return html + "</div></div></section>";
   }
 
   // 검색: 사건·설명에 걸리는 행 + 이름이 걸리는 기간 안의 모든 행
@@ -712,37 +723,79 @@
     (window.TIMELINE || []).forEach(function (g) {
       var L = layoutGroup(g);
       var hitPeriods = g.periods.filter(function (p) { return p.n.toLowerCase().indexOf(q) !== -1; });
-      var rows = [];
+      var idx = [];
       L.rows.forEach(function (r, i) {
         var hay = (r.label + " " + r.items.join(" ") + " " + (r.note || "")).toLowerCase();
         var inPeriod = hitPeriods.some(function (p) { return r.y >= p.f && r.y <= p.t; });
-        if (hay.indexOf(q) !== -1 || inPeriod) rows.push(i);
+        if (hay.indexOf(q) !== -1 || inPeriod) idx.push(i);
       });
-      if (!rows.length) return;
-      html += '<div class="tl-group"><h2>' + esc(g.g) + "</h2>" +
-        (hitPeriods.length ? '<div class="tl-legend">' + hitPeriods.map(function (p) {
-          return '<span class="tl-leg"><i style="background:' + tlColor(p.c) + '"></i>' + esc(p.n) +
-            " <small>" + yearText(p.f) + "~" + yearText(p.t) + "</small></span>";
-        }).join("") + "</div>" : "") +
-        '<div class="tl-flat">' + rows.map(function (i) {
-          return '<div class="tl-flat-row"><div class="tl-year"><b>' + esc(L.rows[i].label) + "</b></div>" + rowBodyHtml(L.rows[i], L.chips[i]) + "</div>";
-        }).join("") + "</div></div>";
+      if (!idx.length) return;
+      html += '<section class="tl-group"><div class="tl-head"><div><h2>' + esc(g.g) + '</h2><span class="tl-range">' +
+        idx.length + "칸 찾음" + (hitPeriods.length ? " · " + hitPeriods.map(function (p) {
+          return esc(p.n) + " " + yearText(p.f) + "~" + yearText(p.t);
+        }).join(", ") : "") + "</span></div></div>" +
+        '<div class="tl-results">' + idx.map(function (i) { return cardHtml(L.rows[i], L.chips[i], true); }).join("") + "</div></section>";
     });
     return html;
   }
 
   function renderTimeline() {
     var q = $("#tl-search").value.trim().toLowerCase();
-    var html = q ? renderTimelineSearch(q) : (window.TIMELINE || []).map(renderTimelineGroup).join("");
+    var groups = window.TIMELINE || [];
+    $("#tl-jump").innerHTML = q ? "" : groups.map(function (g, i) {
+      return '<button class="mini" data-jump="' + i + '">' + esc(g.g) + "</button>";
+    }).join("");
+    var html = q ? renderTimelineSearch(q) : groups.map(renderTimelineGroup).join("");
     $("#timeline-list").innerHTML = html || '<p class="empty">검색 결과가 없습니다.</p>';
+  }
+
+  function scrollTrack(gi, dir) {
+    var el = document.getElementById("tl-s" + gi);
+    if (el) el.scrollBy({ left: dir * el.clientWidth * 0.8, behavior: "smooth" });
   }
 
   function initTimeline() {
     $("#tl-search").addEventListener("input", renderTimeline);
+    $("#timeline-list").addEventListener("click", function (e) {
+      var b = e.target.closest(".tl-arrow");
+      if (b) scrollTrack(b.dataset.g, parseInt(b.dataset.dir, 10));
+    });
+    $("#tl-jump").addEventListener("click", function (e) {
+      var b = e.target.closest("[data-jump]");
+      var sec = b && document.getElementById("tl-g" + b.dataset.jump);
+      if (sec) window.scrollTo({ top: sec.getBoundingClientRect().top + window.scrollY - 120, behavior: "smooth" });
+    });
     renderTimeline();
   }
 
+  // ---------- 테마 ----------
+  function currentTheme() {
+    var t = document.documentElement.getAttribute("data-theme");
+    if (t) return t;
+    return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+  function paintThemeButton() {
+    var dark = currentTheme() === "dark";
+    var b = $("#theme-toggle");
+    b.textContent = dark ? "\u2600" : "\u263E";
+    b.title = dark ? "라이트 모드로" : "다크 모드로";
+  }
+  function initTheme() {
+    paintThemeButton();
+    $("#theme-toggle").addEventListener("click", function () {
+      var next = currentTheme() === "dark" ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", next);
+      try { localStorage.setItem("hanneung_theme", next); } catch (e) {}
+      paintThemeButton();
+    });
+    if (window.matchMedia) {
+      var mq = window.matchMedia("(prefers-color-scheme: dark)");
+      if (mq.addEventListener) mq.addEventListener("change", paintThemeButton);
+    }
+  }
+
   // ---------- 시작 ----------
+  initTheme();
   initTabs();
   initConcept();
   initQuiz();

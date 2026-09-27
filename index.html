@@ -8,6 +8,7 @@
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="theme-color" content="#8b1e2d">
+<script>try{var t=localStorage.getItem("hanneung_theme");if(t==="dark"||t==="light")document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -21,9 +22,12 @@
         <div class="brand-sub">Korean History in a Month · 심화 대비 31일 플랜</div>
       </div>
     </div>
-    <div class="dday" id="dday">
-      <div class="dday-num">D-</div>
-      <div class="dday-label">2026.10.17 시험</div>
+    <div class="topbar-right">
+      <button class="theme-toggle" id="theme-toggle" type="button" aria-label="다크 모드 전환"></button>
+      <div class="dday" id="dday">
+        <div class="dday-num">D-</div>
+        <div class="dday-label">2026.10.17 시험</div>
+      </div>
     </div>
   </div>
   <nav class="tabs" id="tabs">
@@ -160,11 +164,12 @@
   <section class="view" id="view-timeline">
     <div class="view-head">
       <h1>연표 · 타임라인</h1>
-      <p>왼쪽 막대는 이어진 기간, 가운데 줄은 사건입니다. 한 칸에 여러 줄이 있으면 같은 해에 일어난 일이고, 노란 칸은 한 시대가 끝나고 다음 시대가 시작되는 전환점입니다.</p>
+      <p>시간은 왼쪽에서 오른쪽으로 흐릅니다. 위의 색 막대는 이어진 기간이고, 아래 카드는 그해의 사건입니다. 노란 카드는 한 시대가 끝나고 다음 시대가 시작되는 전환점입니다.</p>
     </div>
     <div class="search-row">
-      <input type="search" id="tl-search" placeholder="검색 (예: 1270, 무신 정권, 환국)">
+      <input type="search" id="tl-search" placeholder="검색 (예: 1270, 무신 정권, 만적)">
     </div>
+    <div class="tl-jump" id="tl-jump"></div>
     <div id="timeline-list"></div>
   </section>
 
