@@ -236,8 +236,6 @@ main{max-width:1040px;margin:0 auto;padding:24px 20px 60px}
 .topic-body li{margin-bottom:14px;padding-left:2px}
 .topic-body li:last-child{margin-bottom:0}
 .topic-body li::marker{color:var(--accent)}
-.pt-line{display:block}
-.pt-line + .pt-line{margin-top:4px;padding-left:12px;border-left:2px solid var(--line)}
 /* 용어 풀이 */
 .term{
   text-decoration:underline dotted;text-decoration-color:color-mix(in srgb,currentColor 60%,transparent);

@@ -60,19 +60,6 @@
     }).join("");
   }
 
-  // 괄호 밖의 " / "를 기준으로 한 줄씩 나눈다
-  function splitSlash(s) {
-    var out = [], depth = 0, start = 0;
-    for (var i = 0; i < s.length; i++) {
-      var c = s.charAt(i);
-      if (c === "(" || c === "[") depth++;
-      else if (c === ")" || c === "]") depth--;
-      else if (depth === 0 && s.substr(i, 3) === " / ") { out.push(s.slice(start, i)); start = i + 3; i += 2; }
-    }
-    out.push(s.slice(start));
-    return out;
-  }
-
   function initGlossary() {
     var pop = document.createElement("div");
     pop.id = "gloss-pop";
@@ -443,9 +430,7 @@
           '<div class="topic-head"><span class="topic-arrow">▶</span><h3>' + esc(t.title) + "</h3></div>" +
           '<div class="topic-body"><ul class="points">' +
           t.points.map(function (p) {
-            return "<li>" + splitSlash(p).map(function (line) {
-              return '<span class="pt-line">' + linkTerms(fmt(line), era.id, seen) + "</span>";
-            }).join("") + "</li>";
+            return "<li>" + linkTerms(fmt(p), era.id, seen) + "</li>";
           }).join("") +
           '</ul><div class="kw-row">' +
           t.keywords.map(function (k) { return '<span class="kw">' + linkTerms(esc(k), era.id, {}) + "</span>"; }).join("") +
