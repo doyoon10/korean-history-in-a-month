@@ -490,15 +490,40 @@
     return m ? m[1] : def;
   }
   function noteBulletsHtml(raw, era, seen) {
+    function toNote(n, at) {
+      return { label: n.label, html: linkTerms(fmt(n.text), era, seen), at: at,
+        short: window.noteStripStars(n.text).length <= 12 };
+    }
+    // 연도처럼 짧은 괄호 풀이에는 용어 뜻을 덧붙인다
+    function mergeGloss(notes, m, def) {
+      for (var i = 0; i < notes.length; i++) {
+        if (notes[i].label.indexOf(m) === -1) continue;
+        if (notes[i].short && !notes[i].merged) {
+          notes[i].html += " · " + esc(glossShort(def));
+          notes[i].merged = true;
+        }
+        return true;
+      }
+      return false;
+    }
+
     return window.parseNote(raw).map(function (b) {
       var subjPlain = window.noteStripStars(b.subject);
-      // 주체에 들어 있는 용어는 따로 풀지 않는다
-      if (glossRe && subjPlain) subjPlain.replace(glossRe, function (m) { seen[m] = 1; return m; });
+      var subjNotes = b.subjectNotes.map(function (n) { return toNote(n, -1); });
+      // 주체에 들어 있는 용어는 따로 풀지 않고, 주체의 짧은 괄호 풀이에만 뜻을 덧붙인다
+      if (glossRe && subjPlain) {
+        subjPlain.replace(glossRe, function (m) {
+          var def = !seen[m] && glossFor(m, era);
+          if (def) mergeGloss(subjNotes, m, def);
+          seen[m] = 1;
+          return m;
+        });
+      }
 
       var joined = b.lines.join("\n");
       var plain = joined.replace(/\*\*/g, "");
       var notes = b.notes.map(function (n) {
-        return { label: n.label, html: linkTerms(fmt(n.text), era, seen), at: joined.slice(0, n.at).replace(/\*\*/g, "").length };
+        return toNote(n, joined.slice(0, n.at).replace(/\*\*/g, "").length);
       });
       if (glossRe) {
         plain.replace(glossRe, function (m, at, str) {
@@ -506,16 +531,16 @@
           var def = glossFor(m, era);
           if (!def) return m;
           seen[m] = 1;
-          // 괄호 설명이 이미 붙은 용어는 그 설명을 쓴다
-          if (notes.some(function (n) { return n.label.indexOf(m) !== -1; })) return m;
-          notes.push({ label: m, html: esc(glossShort(def)), at: at, gloss: true });
+          // 괄호 풀이가 이미 붙은 용어면 거기에 합친다
+          if (!mergeGloss(notes, m, def)) notes.push({ label: m, html: esc(glossShort(def)), at: at });
           return m;
         });
       }
-      notes.sort(function (a, b2) { return a.at - b2.at; });
+      notes.sort(function (x, y) { return x.at - y.at; });
+      notes = subjNotes.concat(notes);
 
       return '<li class="nt"><div class="nt-main">' +
-        (b.subject ? '<span class="nt-subj">' + esc(subjPlain) + '</span><span class="nt-colon"> : </span>' : "") +
+        (b.subject ? '<span class="nt-subj">' + fmt(b.subject).replace(/<\/?b>/g, "") + '</span><span class="nt-colon"> : </span>' : "") +
         b.lines.map(fmt).join('<span class="nt-sep"> / </span>') + "</div>" +
         (notes.length ? '<div class="nt-notes">' + notes.map(function (n) {
           return '<span class="nt-note" tabindex="0" data-label="' + esc(n.label) + '"><span class="nt-head"><span class="nt-arrow">ㄴ→</span>' + esc(n.label) + "</span>" +
