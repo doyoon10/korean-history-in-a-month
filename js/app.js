@@ -96,14 +96,21 @@
       if (!node || !node.closest) return null;
       var t = node.closest(".term");
       if (t) return t;
-      var n = node.closest(".nt-note");
+      var n = node.closest(".nt-note, .nt-mark");
       return n && !n.closest(".notes-open") ? n : null;
+    }
+    // 본문 밑줄 단어는 같은 불릿의 짝 풀이를 보여 준다
+    function noteOf(el) {
+      if (el.classList.contains("nt-note")) return el;
+      var li = el.closest("li.nt");
+      return li && li.querySelector('.nt-note[data-k="' + el.dataset.k + '"]');
     }
     function show(el) {
       var title, def;
-      if (el.classList.contains("nt-note")) {
-        title = el.dataset.label;
-        def = el.querySelector(".nt-text").textContent;
+      var note = (el.classList.contains("nt-note") || el.classList.contains("nt-mark")) && noteOf(el);
+      if (note) {
+        title = note.dataset.label;
+        def = note.querySelector(".nt-text").textContent;
       } else {
         title = el.dataset.term;
         def = glossFor(el.dataset.term, el.dataset.era);
@@ -489,6 +496,50 @@
     var m = def.match(/^(.+?)\.\s/);
     return m ? m[1] : def;
   }
+  // ** 굵게와 줄바꿈(\n = ' / ')이 섞인 원문을 그리면서, 풀이가 달린 범위에 밑줄 span을 씌운다.
+  // ranges: 굵게 표시를 뺀 글자 위치 기준 [{s, e, k}], 겹치지 않게 정렬된 상태
+  function renderMarked(raw, ranges) {
+    var out = "", p = 0, bold = false, mark = null, ri = 0;
+    function flipB(on) { out += on ? "<b>" : "</b>"; }
+    for (var i = 0; i < raw.length; ) {
+      if (raw.substr(i, 2) === "**") { bold = !bold; flipB(bold); i += 2; continue; }
+      if (mark && p === mark.e) {
+        if (bold) flipB(false);
+        out += "</span>"; mark = null;
+        if (bold) flipB(true);
+      }
+      if (!mark && ri < ranges.length && p === ranges[ri].s) {
+        mark = ranges[ri++];
+        if (bold) flipB(false);
+        out += '<span class="nt-mark" data-k="' + mark.k + '">';
+        if (bold) flipB(true);
+      }
+      var c = raw.charAt(i);
+      out += c === "\n" ? '<span class="nt-sep"> / </span>' : esc(c);
+      p++; i++;
+    }
+    if (mark) { if (bold) flipB(false); out += "</span>"; if (bold) flipB(true); }
+    if (bold) flipB(false);
+    return out;
+  }
+  // 라벨이 본문 어디에 있는지 찾는다 (at = 라벨이 끝나는 위치 추정값)
+  function rangeFor(plain, label, at) {
+    var guess = at - label.length;
+    if (guess >= 0 && plain.substr(guess, label.length) === label) return guess;
+    var i = plain.lastIndexOf(label, Math.max(0, at));
+    return i >= 0 ? i : plain.indexOf(label);
+  }
+  function toRanges(plain, notes, base) {
+    var out = [];
+    notes.forEach(function (n, j) {
+      var s = n.gloss ? n.at : rangeFor(plain, n.label, n.at);
+      if (s >= 0) out.push({ s: s, e: s + n.label.length, k: base + j });
+    });
+    out.sort(function (a, b) { return a.s - b.s; });
+    var last = -1;
+    return out.filter(function (r) { if (r.s < last) return false; last = r.e; return true; });
+  }
+
   function noteBulletsHtml(raw, era, seen) {
     function toNote(n, at) {
       return { label: n.label, html: linkTerms(fmt(n.text), era, seen), at: at,
@@ -532,18 +583,20 @@
           if (!def) return m;
           seen[m] = 1;
           // 괄호 풀이가 이미 붙은 용어면 거기에 합친다
-          if (!mergeGloss(notes, m, def)) notes.push({ label: m, html: esc(glossShort(def)), at: at });
+          if (!mergeGloss(notes, m, def)) notes.push({ label: m, html: esc(glossShort(def)), at: at, gloss: true });
           return m;
         });
       }
       notes.sort(function (x, y) { return x.at - y.at; });
+      var subjRanges = toRanges(subjPlain, subjNotes, 0);
+      var bodyRanges = toRanges(plain, notes, subjNotes.length);
       notes = subjNotes.concat(notes);
 
       return '<li class="nt"><div class="nt-main">' +
-        (b.subject ? '<span class="nt-subj">' + fmt(b.subject).replace(/<\/?b>/g, "") + '</span><span class="nt-colon"> : </span>' : "") +
-        b.lines.map(fmt).join('<span class="nt-sep"> / </span>') + "</div>" +
-        (notes.length ? '<div class="nt-notes">' + notes.map(function (n) {
-          return '<span class="nt-note" tabindex="0" data-label="' + esc(n.label) + '"><span class="nt-head"><span class="nt-arrow">ㄴ→</span>' + esc(n.label) + "</span>" +
+        (b.subject ? '<span class="nt-subj">' + renderMarked(b.subject, subjRanges) + '</span><span class="nt-colon"> : </span>' : "") +
+        renderMarked(joined, bodyRanges) + "</div>" +
+        (notes.length ? '<div class="nt-notes">' + notes.map(function (n, k) {
+          return '<span class="nt-note" tabindex="0" data-k="' + k + '" data-label="' + esc(n.label) + '"><span class="nt-head"><span class="nt-arrow">ㄴ→</span>' + esc(n.label) + "</span>" +
             '<span class="nt-text">' + n.html + "</span></span>";
         }).join("") + "</div>" : "") +
         "</li>";
@@ -562,6 +615,20 @@
       btn.textContent = open ? "풀이 접기" : "풀이 펼치기";
       btn.setAttribute("aria-pressed", open ? "true" : "false");
     }
+    // 본문 밑줄 단어와 아래 풀이 단어 중 하나에 올리면 짝도 같이 강조
+    function pair(el, on) {
+      var li = el.closest("li.nt");
+      if (!li) return;
+      $$('[data-k="' + el.dataset.k + '"]', li).forEach(function (x) { x.classList.toggle("hl", on); });
+    }
+    list.addEventListener("mouseover", function (e) {
+      var el = e.target.closest && e.target.closest(".nt-mark, .nt-note");
+      if (el) pair(el, true);
+    });
+    list.addEventListener("mouseout", function (e) {
+      var el = e.target.closest && e.target.closest(".nt-mark, .nt-note");
+      if (el && !(e.relatedTarget && el.contains(e.relatedTarget))) pair(el, false);
+    });
     btn.addEventListener("click", function () {
       open = !open;
       try { localStorage.setItem(NOTES_KEY, open ? "1" : "0"); } catch (e) {}

@@ -495,3 +495,6 @@ html.theme-vt::view-transition-new(root){animation-name:theme-fade-in}
 #note-toggle{flex:none;white-space:nowrap}
 #note-toggle.active{background:var(--blue);border-color:var(--blue);color:#fff}
 @media (max-width:480px){.notes-open .nt-note{flex-direction:column;gap:0}.notes-open .nt-note .nt-head{max-width:none}.notes-open .nt-text{padding-left:22px}}
+.nt-mark{text-decoration:underline;text-decoration-color:color-mix(in srgb,var(--blue) 70%,transparent);text-decoration-thickness:1.5px;text-underline-offset:4px;cursor:help;border-radius:3px}
+.nt-mark.hl,.nt-note.hl .nt-head{background:color-mix(in srgb,var(--blue) 18%,transparent)}
+.notes-open .nt-mark{cursor:auto}
