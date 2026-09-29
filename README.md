@@ -1,7 +1,7 @@
 # 한달 한국사 · Korean History in a Month
 
 > A 31-day study site for the Korean History Proficiency Test, level 심화.
-> Concepts, 1,001 original practice questions in the style of past exams, and a day-by-day plan. No build step, no dependencies.
+> Concepts with photos and a hover glossary, 1,083 original practice questions in the style of past exams, and a day-by-day plan. No build step, no dependencies.
 
 2026년 10월 17일 한국사능력검정시험 심화 대비용 학습 사이트입니다.
 1년 전 조금 공부해 본 상태에서 한 달 만에 심화 1급(80점), 최소 3급(60점)을 목표로 구성했습니다.
@@ -35,8 +35,8 @@ python3 -m http.server 8777
 | --- | --- |
 | 대시보드 | D-day, 오늘 할 일, 진도율, 시대별 정답률, 합격 전략 |
 | 학습 플랜 | 31일 일자별 계획. 1급 코스(31일)와 3급 코스(★ 23일) 전환 가능 |
-| 개념 정리 | 11개 시대 56개 주제. 굵은 글씨가 시험에 그대로 나오는 부분 |
-| 기출 문제 | 기출 유형 1,001문항 5지선다. 안 푼 문제부터 출제, 학습 모드와 실전 모드 |
+| 개념 정리 | 11개 시대 56개 주제, 문화유산 사진 82장. 굵은 글씨가 시험에 그대로 나오는 부분, 점선 밑줄 용어는 마우스를 올리면 풀이 |
+| 기출 문제 | 기출 유형 1,083문항 5지선다(사진 자료 문제 82개 포함). 안 푼 문제부터 출제, 학습 모드와 실전 모드 |
 | 오답 노트 | 틀린 문제 자동 저장, 오답만 다시 풀기 |
 | 연표·암기 | 순서 나열 문제 대비 핵심 연표 약 200개 |
 
@@ -51,6 +51,10 @@ python3 -m http.server 8777
 ## 문제 출처
 
 문제는 모두 실제 출제 방식에 맞춰 새로 만든 연습 문제입니다. 공식 기출문제는 국사편찬위원회 자료로 공공누리 제4유형(출처표시, 상업적 이용금지, 변경금지)이라 원문을 옮기지 않았습니다. 기출문제는 [한국사능력검정시험 홈페이지](https://www.historyexam.go.kr/)의 시험자료실에서 받을 수 있습니다.
+
+## 사진 출처
+
+문화유산 사진은 모두 [Wikimedia Commons](https://commons.wikimedia.org/)에 자유 이용 조건(CC BY, CC BY-SA, CC0, 퍼블릭 도메인, 공공누리 제1유형)으로 올라온 것입니다. 파일은 저장소에 넣지 않고 Commons에서 바로 불러오며, 각 사진 아래에 저작자와 라이선스를 적고 원본 페이지로 연결했습니다. 목록은 `js/data/images.js`에 있습니다.
 
 ## 배점 참고
 

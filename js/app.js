@@ -60,6 +60,29 @@
     }).join("");
   }
 
+  // ---------- 사진 ----------
+  // named=false면 문제용: 이름을 숨기고 출처만 보여 준다
+  function figureHtml(id, named) {
+    var im = (window.IMAGES || {})[id];
+    if (!im) return "";
+    var img = '<img src="' + esc(im.src) + '" width="' + im.w + '" height="' + im.h + '" alt="' +
+      (named ? esc(im.name) : "문제 자료 사진") + '" loading="lazy" referrerpolicy="no-referrer"' +
+      " onerror=\"this.closest('figure').hidden=true\">";
+    return '<figure class="photo">' +
+      (named ? '<a class="photo-img" href="' + esc(im.src) + '" target="_blank" rel="noopener">' + img + "</a>" : '<div class="photo-img">' + img + "</div>") +
+      "<figcaption>" + (named ? '<span class="photo-name">' + esc(im.name) + "</span>" : "") +
+      '<a class="photo-credit" href="' + esc(im.page) + '" target="_blank" rel="noopener">' + esc(im.credit) + "</a>" +
+      "</figcaption></figure>";
+  }
+  var IMAGES_BY_TOPIC = (function () {
+    var m = {};
+    Object.keys(window.IMAGES || {}).forEach(function (id) {
+      var t = window.IMAGES[id].topic;
+      (m[t] = m[t] || []).push(id);
+    });
+    return m;
+  })();
+
   function initGlossary() {
     var pop = document.createElement("div");
     pop.id = "gloss-pop";
@@ -431,8 +454,10 @@
           '<div class="topic-body"><ul class="points">' +
           t.points.map(function (p) {
             return "<li>" + linkTerms(fmt(p), era.id, seen) + "</li>";
-          }).join("") +
-          '</ul><div class="kw-row">' +
+          }).join("") + "</ul>" +
+          (IMAGES_BY_TOPIC[t.id] ? '<div class="photo-row">' +
+            IMAGES_BY_TOPIC[t.id].map(function (id) { return figureHtml(id, true); }).join("") + "</div>" : "") +
+          '<div class="kw-row">' +
           t.keywords.map(function (k) { return '<span class="kw">' + linkTerms(esc(k), era.id, {}) + "</span>"; }).join("") +
           '</div><div class="tip">' + linkTerms(fmt(t.tip), era.id, seen) + "</div></div></div>";
       });
@@ -561,12 +586,14 @@
       '<span class="q-count">' + (run.i + 1) + " / " + run.list.length + "</span></div>" +
       '<div class="q-card">' +
       '<div class="q-meta"><span class="q-tag">' + esc(ERA_NAMES[q.era] || q.era) + "</span>" +
-      '<span class="q-tag">' + esc(q.topic) + "</span>" +
+      // 주제 태그는 답을 암시하므로 채점 뒤에만 보여 준다
+      (revealed ? '<span class="q-tag">' + esc(q.topic) + "</span>" : "") +
       '<span class="q-tag diff">난이도 ' + q.diff + "/5</span>" +
       (run.status ? '<span class="q-tag st-' + run.status[run.i] + '">' +
         { fresh: "처음 푸는 문제", wrong: "틀렸던 문제", again: "다시 푸는 문제" }[run.status[run.i]] + "</span>" : "") +
       "</div>" +
       '<div class="q-stem">' + esc(q.stem) + "</div>" +
+      (q.img ? figureHtml(q.img, revealed) : "") +
       '<div class="q-choices">';
 
     q.choices.forEach(function (c, idx) {
@@ -678,7 +705,7 @@
     if (wrongList.length) {
       html += '<div class="card"><h2>틀린 문제 ' + wrongList.length + "개</h2>" +
         wrongList.map(function (w) {
-          return '<div class="wrong-item"><div class="wrong-stem">' + esc(w.q.stem) + "</div>" +
+          return '<div class="wrong-item"><div class="wrong-stem">' + esc(w.q.stem) + "</div>" + (w.q.img ? figureHtml(w.q.img, true) : "") +
             '<div class="wrong-ans">정답 ' + (w.q.answer + 1) + "번 · " + esc(w.q.choices[w.q.answer]) + "</div>" +
             (w.mine !== undefined ? '<div class="wrong-mine">내 답 ' + (w.mine + 1) + "번 · " + esc(w.q.choices[w.mine]) + "</div>" : '<div class="wrong-mine">무응답</div>') +
             '<div class="wrong-ex">' + linkTerms(esc(w.q.explain), w.q.era, {}) + "</div></div>";
@@ -720,7 +747,7 @@
       return '<div class="wrong-item">' +
         '<div class="q-meta"><span class="q-tag">' + esc(ERA_NAMES[q.era] || q.era) + "</span>" +
         '<span class="q-tag">' + esc(q.topic) + '</span><span class="q-tag">' + w.at + "</span></div>" +
-        '<div class="wrong-stem">' + esc(q.stem) + "</div>" +
+        '<div class="wrong-stem">' + esc(q.stem) + "</div>" + (q.img ? figureHtml(q.img, true) : "") +
         '<div class="wrong-ans">정답 ' + (q.answer + 1) + "번 · " + esc(q.choices[q.answer]) + "</div>" +
         '<div class="wrong-mine">내 답 ' + (w.mine + 1) + "번 · " + esc(q.choices[w.mine]) + "</div>" +
         '<div class="wrong-ex">' + linkTerms(esc(q.explain), q.era, {}) + '<div class="ex-kw" style="margin-top:6px;font-size:12px">핵심어 · ' + esc(q.keyword) + "</div></div></div>";
