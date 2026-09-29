@@ -507,7 +507,7 @@
           '<div class="topic' + (open ? " open" : "") + '" id="topic-' + t.id + '">' +
           '<div class="topic-head"><span class="topic-arrow">▶</span><h3>' + esc(t.title) + "</h3></div>" +
           '<div class="topic-body"><ul class="points">' +
-          t.points.map(function (p) { return noteBulletsHtml(p, era.id, seen); }).join("") + "</ul>" +
+          t.points.map(function (p) { return noteBulletsHtml(p, era.id, seen, t.id); }).join("") + "</ul>" +
           (IMAGES_BY_TOPIC[t.id] ? '<div class="photo-row">' +
             IMAGES_BY_TOPIC[t.id].map(function (id) { return figureHtml(id, true); }).join("") + "</div>" : "") +
           '<div class="kw-row">' +
@@ -568,12 +568,19 @@
     return out.filter(function (r) { if (r.s < last) return false; last = r.e; return true; });
   }
 
-  function noteBulletsHtml(raw, era, seen) {
+  function noteBulletsHtml(raw, era, seen, topicId) {
     // 괄호에서 온 풀이: 라벨에 든 용어의 쉬운 뜻 + 괄호 속 내용(참고)
     function parenNote(n, at) {
       var note = { label: n.label, at: at, detail: linkTerms(fmt(readable(n.text)), era, {}) };
+      var easy = (window.NOTE_EASY || {})[topicId + "|" + n.label];
       var term = glossInLabel(n.label, era);
-      if (term) {
+      if (easy) {
+        // 이 라벨만을 위해 쓴 쉬운 설명이 있으면 그것을 쓴다
+        var e = splitDef(easy);
+        note.type = e.type;
+        note.desc = e.desc;
+        if (term) seen[term] = 1;
+      } else if (term) {
         var d = splitDef(glossFor(term, era));
         note.type = d.type;
         note.desc = (term !== n.label ? term + " — " : "") + d.desc;

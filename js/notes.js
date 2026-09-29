@@ -50,7 +50,7 @@
         depth--;
         if (depth === 0 && start >= 0) {
           var label = body.slice(Math.max(lastDelim, lastParen), start);
-          var clean = stripStars(label).replace(/^[\s·+~\-]+/, "").trim();
+          var clean = stripStars(label).replace(/^[\s·+~\-–—]+/, "").trim();
           // 라벨이 길면 마지막 굵은 글씨 뒤의 말만 쓴다
           if (clean.length > 14) {
             var parts = label.split("**");
