@@ -146,10 +146,11 @@
       }
       if (!desc && !detail) return;
       cur = el;
+      // 첫 줄은 필기에 그대로 옮겨 적는 모양: 단어(괄호 내용). 괄호가 없던 단어는 쉬운 뜻을 괄호에 넣는다
+      var pen = detail || desc;
       pop.innerHTML = '<div class="gp-head">' + (type ? '<span class="gp-type">' + esc(type) + "</span>" : "") +
-        '<span class="gp-title">' + esc(title) + "</span></div>" +
-        (desc ? '<div class="gp-desc">' + esc(desc) + "</div>" : "") +
-        (detail ? '<div class="gp-detail' + (desc ? "" : " only") + '">' + esc(detail) + "</div>" : "");
+        '<span class="gp-title">' + esc(title) + '<span class="gp-paren">(' + esc(pen) + ")</span></span></div>" +
+        (detail && desc ? '<div class="gp-desc">' + esc(desc) + "</div>" : "");
       pop.style.left = "0px";
       pop.style.top = "0px";
       pop.hidden = false;
@@ -526,16 +527,26 @@
   // 손필기 모양: "주체 : 핵심어들" 한 줄 + 아래에 'ㄴ→ 단어' (호버하면 종류·쉬운 뜻·괄호 속 참고)
   // ** 굵게와 줄바꿈(\n = ' / ')이 섞인 원문을 그리면서, 풀이가 달린 범위에 밑줄 span을 씌운다.
   // ranges: 굵게 표시를 뺀 글자 위치 기준 [{s, e, k}], 겹치지 않게 정렬된 상태
-  function renderMarked(raw, ranges) {
-    var out = "", p = 0, bold = false, mark = null, ri = 0;
+  // parens: 원래 괄호 [{pos, html}] (pos 순). 제자리에 숨겨 두고 "풀이 펼치기"일 때 파란 괄호로 보인다
+  function renderMarked(raw, ranges, parens) {
+    var out = "", p = 0, bold = false, mark = null, ri = 0, pi = 0;
     function flipB(on) { out += on ? "<b>" : "</b>"; }
-    for (var i = 0; i < raw.length; ) {
-      if (raw.substr(i, 2) === "**") { bold = !bold; flipB(bold); i += 2; continue; }
-      if (mark && p === mark.e) {
+    function closeMark() {
+      if (bold) flipB(false);
+      out += "</span>"; mark = null;
+      if (bold) flipB(true);
+    }
+    function putParens(all) {
+      while (pi < parens.length && (all || parens[pi].pos <= p)) {
         if (bold) flipB(false);
-        out += "</span>"; mark = null;
+        out += '<span class="nt-inl">(' + parens[pi++].html + ")</span>";
         if (bold) flipB(true);
       }
+    }
+    for (var i = 0; i < raw.length; ) {
+      if (raw.substr(i, 2) === "**") { bold = !bold; flipB(bold); i += 2; continue; }
+      if (mark && p === mark.e) closeMark();
+      putParens(false);
       if (!mark && ri < ranges.length && p === ranges[ri].s) {
         mark = ranges[ri++];
         if (bold) flipB(false);
@@ -546,7 +557,8 @@
       out += c === "\n" ? '<span class="nt-sep"> / </span>' : esc(c);
       p++; i++;
     }
-    if (mark) { if (bold) flipB(false); out += "</span>"; if (bold) flipB(true); }
+    if (mark) closeMark();
+    putParens(true);
     if (bold) flipB(false);
     return out;
   }
@@ -570,8 +582,9 @@
 
   function noteBulletsHtml(raw, era, seen, topicId) {
     // 괄호에서 온 풀이: 라벨에 든 용어의 쉬운 뜻 + 괄호 속 내용(참고)
-    function parenNote(n, at) {
-      var note = { label: n.label, at: at, detail: linkTerms(fmt(readable(n.text)), era, {}) };
+    // pos: 원래 괄호가 있던 자리 (굵게 표시를 뺀 글자 위치)
+    function parenNote(n, at, pos) {
+      var note = { label: n.label, at: at, pos: pos, detail: linkTerms(fmt(readable(n.text)), era, {}) };
       var easy = (window.NOTE_EASY || {})[topicId + "|" + n.label];
       var term = glossInLabel(n.label, era);
       if (easy) {
@@ -585,14 +598,11 @@
         note.type = d.type;
         note.desc = (term !== n.label ? term + " — " : "") + d.desc;
         seen[term] = 1;
-        // 참고가 뜻에 이미 들어 있으면(연도 등) 반복하지 않는다
-        var bare = window.noteStripStars(n.text).replace(/\s/g, "");
-        if (note.desc.replace(/\s/g, "").indexOf(bare) !== -1) note.detail = "";
       }
       return note;
     }
-    function noteHtml(n, k) {
-      return '<span class="nt-note" tabindex="0" data-k="' + k + '" data-label="' + esc(n.label) + '">' +
+    function noteHtml(n, k, inline) {
+      return '<span class="nt-note' + (inline ? " inl" : "") + '" tabindex="0" data-k="' + k + '" data-label="' + esc(n.label) + '">' +
         '<span class="nt-head"><span class="nt-arrow">ㄴ→</span>' + esc(n.label) + "</span>" +
         '<span class="nt-text"><span class="nt-type">' + esc(n.type || "") + "</span>" +
         '<span class="nt-desc">' + esc(n.desc || "") + "</span>" +
@@ -601,14 +611,17 @@
 
     return window.parseNote(raw).map(function (b) {
       var subjPlain = window.noteStripStars(b.subject);
-      var subjNotes = b.subjectNotes.map(function (n) { return parenNote(n, -1); });
+      var subjNotes = b.subjectNotes.map(function (n) {
+        return parenNote(n, -1, b.subject.slice(0, n.at).replace(/\*\*/g, "").length);
+      });
       // 주체에 들어 있는 용어는 따로 풀지 않는다
       if (glossRe && subjPlain) subjPlain.replace(glossRe, function (m) { seen[m] = 1; return m; });
 
       var joined = b.lines.join("\n");
       var plain = joined.replace(/\*\*/g, "");
       var notes = b.notes.map(function (n) {
-        return parenNote(n, joined.slice(0, n.at).replace(/\*\*/g, "").length);
+        var pos = joined.slice(0, n.at).replace(/\*\*/g, "").length;
+        return parenNote(n, pos, pos);
       });
       if (glossRe) {
         plain.replace(glossRe, function (m, at, str) {
@@ -627,11 +640,17 @@
       var subjRanges = toRanges(subjPlain, subjNotes, 0);
       var bodyRanges = toRanges(plain, notes, subjNotes.length);
       notes = subjNotes.concat(notes);
+      // 괄호 내용은 원래 자리에도 숨겨 둔다 (펼치기 모드에서 필기 모양 그대로 보이고, 아래 풀이에서는 뜻만 보임)
+      var subjParens = [], bodyParens = [];
+      notes.forEach(function (n, k) {
+        if (n.detail) (k < subjNotes.length ? subjParens : bodyParens).push({ pos: n.pos, html: n.detail });
+      });
+      function byPos(x, y) { return x.pos - y.pos; }
 
       return '<li class="nt"><div class="nt-main">' +
-        (b.subject ? '<span class="nt-subj">' + renderMarked(b.subject, subjRanges) + '</span><span class="nt-colon"> : </span>' : "") +
-        renderMarked(joined, bodyRanges) + "</div>" +
-        (notes.length ? '<div class="nt-notes">' + notes.map(noteHtml).join("") + "</div>" : "") +
+        (b.subject ? '<span class="nt-subj">' + renderMarked(b.subject, subjRanges, subjParens.sort(byPos)) + '</span><span class="nt-colon"> : </span>' : "") +
+        renderMarked(joined, bodyRanges, bodyParens.sort(byPos)) + "</div>" +
+        (notes.length ? '<div class="nt-notes">' + notes.map(function (n, k) { return noteHtml(n, k, !!n.detail); }).join("") + "</div>" : "") +
         "</li>";
     }).join("");
   }

@@ -498,15 +498,16 @@ html.theme-vt::view-transition-new(root){animation-name:theme-fade-in}
 .nt-mark{text-decoration:underline;text-decoration-color:color-mix(in srgb,var(--blue) 70%,transparent);text-decoration-thickness:1.5px;text-underline-offset:4px;cursor:help;border-radius:3px}
 .nt-mark.hl,.nt-note.hl .nt-head{background:color-mix(in srgb,var(--blue) 18%,transparent)}
 .notes-open .nt-mark{cursor:auto}
+.nt-inl{display:none;color:var(--blue);font-weight:400}
+.nt-inl b{color:inherit;font-weight:700}
+.notes-open .nt-inl{display:inline}
+.notes-open .nt-note.inl .nt-detail{display:none}
 /* 호버 풀이: 종류 · 제목 / 쉬운 뜻 / 참고 */
-#gloss-pop .gp-head{display:flex;align-items:center;gap:6px;margin-bottom:3px}
+#gloss-pop .gp-head{display:flex;align-items:baseline;gap:6px}
 #gloss-pop .gp-type{flex:none;font-size:11px;font-weight:700;line-height:1.5;padding:0 6px;border-radius:5px;background:var(--accent-soft);color:var(--accent)}
 #gloss-pop .gp-title{font-weight:700;color:var(--ink);font-size:13.5px}
-#gloss-pop .gp-desc{font-size:13.5px;line-height:1.55}
-#gloss-pop .gp-detail{margin-top:6px;padding-top:6px;border-top:1px solid var(--line);font-size:12px;color:var(--ink-soft)}
-#gloss-pop .gp-detail::before{content:"시험 키워드";display:block;font-size:11px;font-weight:700;margin-bottom:1px}
-#gloss-pop .gp-detail.only{margin-top:0;padding-top:0;border-top:0;font-size:13px;color:var(--ink)}
-#gloss-pop .gp-detail.only::before{content:""}
+#gloss-pop .gp-paren{color:var(--blue);font-weight:600}
+#gloss-pop .gp-desc{margin-top:5px;padding-top:5px;border-top:1px solid var(--line);font-size:13px;line-height:1.55}
 .nt-type:empty,.nt-desc:empty,.nt-detail:empty{display:none}
 .notes-open .nt-text .nt-type{display:inline-block;font-size:10.5px;line-height:1.5;padding:0 5px;margin-right:6px;border-radius:4px;background:color-mix(in srgb,var(--blue) 14%,transparent);vertical-align:1px}
 .notes-open .nt-text .nt-type:empty{display:none}
