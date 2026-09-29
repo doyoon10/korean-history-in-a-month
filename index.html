@@ -110,11 +110,12 @@
   <section class="view" id="view-concept">
     <div class="view-head">
       <h1>개념 정리</h1>
-      <p>시대를 고르고 주제를 펼쳐 보세요. <b>굵은 글씨</b>가 시험에 그대로 나오는 부분입니다.</p>
+      <p>시대를 고르고 주제를 펼쳐 보세요. <b>빨간 글씨</b>가 시험에 그대로 나오는 핵심어입니다. <span class="note-blue">파란 ㄴ→ 단어</span>에 마우스를 올리면(휴대폰은 탭) 풀이가 뜹니다. 전부 보려면 "풀이 펼치기"를 누르세요.</p>
     </div>
     <div class="era-filter" id="concept-eras"></div>
     <div class="search-row">
       <input type="search" id="concept-search" placeholder="키워드 검색 (예: 신문왕, 대동법, 신간회)">
+      <button class="mini" id="note-toggle" type="button" aria-pressed="false">풀이 펼치기</button>
     </div>
     <div id="concept-list"></div>
   </section>
@@ -234,6 +235,7 @@
 <script src="js/data/images.js"></script>
 <script src="js/data/plan.js"></script>
 <script src="js/data/timeline.js"></script>
+<script src="js/notes.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

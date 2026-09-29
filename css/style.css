@@ -470,3 +470,28 @@ html.theme-vt::view-transition-new(root){animation-name:theme-fade-in}
 .q-card .photo{margin:14px 0 16px}
 .wrong-item .photo img{max-height:220px;margin:0}
 @media (max-width:480px){.photo-row img{height:120px}.photo-row .photo figcaption{font-size:10.5px}}
+
+/* 손필기 모양 개념 정리 */
+.note-blue{color:var(--blue);font-weight:600}
+.topic-body li.nt{margin-bottom:16px}
+.nt-main{display:block}
+.nt-subj{color:var(--accent);font-weight:700}
+.nt-colon,.nt-sep{color:var(--ink-soft)}
+.nt-notes{margin:5px 0 0;display:flex;flex-wrap:wrap;gap:2px 14px;font-size:13px;line-height:1.7;color:var(--blue)}
+.nt-note{font-weight:600;cursor:help;border-radius:4px;outline:none}
+.nt-note .nt-head{text-decoration:underline dotted;text-decoration-color:color-mix(in srgb,var(--blue) 50%,transparent);text-underline-offset:3px}
+.nt-note:hover .nt-head,.nt-note:focus-visible .nt-head{background:color-mix(in srgb,var(--blue) 12%,transparent);text-decoration:none}
+.nt-arrow{margin-right:3px;opacity:.75;font-weight:400}
+.nt-text{display:none}
+/* 풀이 펼치기 */
+.notes-open .nt-notes{flex-direction:column;flex-wrap:nowrap;gap:3px}
+.notes-open .nt-note{display:flex;gap:8px;align-items:baseline;cursor:auto}
+.notes-open .nt-note .nt-head{flex:none;max-width:42%;text-decoration:none;background:none}
+.notes-open .nt-text{display:block;flex:1;min-width:0;font-weight:400}
+.nt-text b{color:inherit}
+.nt-text .term{text-decoration-color:color-mix(in srgb,var(--blue) 45%,transparent)}
+.search-row{display:flex;gap:8px;align-items:stretch}
+.search-row input{flex:1;min-width:0}
+#note-toggle{flex:none;white-space:nowrap}
+#note-toggle.active{background:var(--blue);border-color:var(--blue);color:#fff}
+@media (max-width:480px){.notes-open .nt-note{flex-direction:column;gap:0}.notes-open .nt-note .nt-head{max-width:none}.notes-open .nt-text{padding-left:22px}}

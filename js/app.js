@@ -91,11 +91,26 @@
     document.body.appendChild(pop);
     var cur = null;
 
+    // 용어(.term) 또는 개념 정리의 파란 풀이 단어(.nt-note, 펼치기 모드가 아닐 때)
+    function target(node) {
+      if (!node || !node.closest) return null;
+      var t = node.closest(".term");
+      if (t) return t;
+      var n = node.closest(".nt-note");
+      return n && !n.closest(".notes-open") ? n : null;
+    }
     function show(el) {
-      var def = glossFor(el.dataset.term, el.dataset.era);
+      var title, def;
+      if (el.classList.contains("nt-note")) {
+        title = el.dataset.label;
+        def = el.querySelector(".nt-text").textContent;
+      } else {
+        title = el.dataset.term;
+        def = glossFor(el.dataset.term, el.dataset.era);
+      }
       if (!def) return;
       cur = el;
-      pop.innerHTML = "<b>" + esc(el.dataset.term) + "</b>" + esc(def);
+      pop.innerHTML = "<b>" + esc(title) + "</b>" + esc(def);
       pop.style.left = "0px";
       pop.style.top = "0px";
       pop.hidden = false;
@@ -111,19 +126,20 @@
     function hide() { cur = null; pop.hidden = true; }
 
     document.addEventListener("mouseover", function (e) {
-      var t = e.target.closest && e.target.closest(".term");
+      var t = target(e.target);
       if (t && t !== cur) show(t);
       else if (!t && cur) hide();
     });
     document.addEventListener("focusin", function (e) {
-      if (e.target.classList && e.target.classList.contains("term")) show(e.target);
+      var t = target(e.target);
+      if (t === e.target) show(t);
     });
     document.addEventListener("focusout", function (e) {
       if (e.target === cur) hide();
     });
     // 터치 기기: 탭으로 열고 다른 곳을 탭하면 닫기
     document.addEventListener("click", function (e) {
-      var t = e.target.closest && e.target.closest(".term");
+      var t = target(e.target);
       if (t) show(t);
       else if (cur) hide();
     }, true);
@@ -452,9 +468,7 @@
           '<div class="topic' + (open ? " open" : "") + '" id="topic-' + t.id + '">' +
           '<div class="topic-head"><span class="topic-arrow">▶</span><h3>' + esc(t.title) + "</h3></div>" +
           '<div class="topic-body"><ul class="points">' +
-          t.points.map(function (p) {
-            return "<li>" + linkTerms(fmt(p), era.id, seen) + "</li>";
-          }).join("") + "</ul>" +
+          t.points.map(function (p) { return noteBulletsHtml(p, era.id, seen); }).join("") + "</ul>" +
           (IMAGES_BY_TOPIC[t.id] ? '<div class="photo-row">' +
             IMAGES_BY_TOPIC[t.id].map(function (id) { return figureHtml(id, true); }).join("") + "</div>" : "") +
           '<div class="kw-row">' +
@@ -468,6 +482,67 @@
     $$(".topic-head", host).forEach(function (h) {
       h.addEventListener("click", function () { h.parentNode.classList.toggle("open"); });
     });
+  }
+
+  // 손필기 모양: "주체 : 핵심어들" 한 줄 + 아래에 'ㄴ→ 용어 풀이' (괄호 설명 또는 용어 풀이)
+  function glossShort(def) {
+    var m = def.match(/^(.+?)\.\s/);
+    return m ? m[1] : def;
+  }
+  function noteBulletsHtml(raw, era, seen) {
+    return window.parseNote(raw).map(function (b) {
+      var subjPlain = window.noteStripStars(b.subject);
+      // 주체에 들어 있는 용어는 따로 풀지 않는다
+      if (glossRe && subjPlain) subjPlain.replace(glossRe, function (m) { seen[m] = 1; return m; });
+
+      var joined = b.lines.join("\n");
+      var plain = joined.replace(/\*\*/g, "");
+      var notes = b.notes.map(function (n) {
+        return { label: n.label, html: linkTerms(fmt(n.text), era, seen), at: joined.slice(0, n.at).replace(/\*\*/g, "").length };
+      });
+      if (glossRe) {
+        plain.replace(glossRe, function (m, at, str) {
+          if (/[가-힣0-9]/.test(str.charAt(at - 1)) || seen[m]) return m;
+          var def = glossFor(m, era);
+          if (!def) return m;
+          seen[m] = 1;
+          // 괄호 설명이 이미 붙은 용어는 그 설명을 쓴다
+          if (notes.some(function (n) { return n.label.indexOf(m) !== -1; })) return m;
+          notes.push({ label: m, html: esc(glossShort(def)), at: at, gloss: true });
+          return m;
+        });
+      }
+      notes.sort(function (a, b2) { return a.at - b2.at; });
+
+      return '<li class="nt"><div class="nt-main">' +
+        (b.subject ? '<span class="nt-subj">' + esc(subjPlain) + '</span><span class="nt-colon"> : </span>' : "") +
+        b.lines.map(fmt).join('<span class="nt-sep"> / </span>') + "</div>" +
+        (notes.length ? '<div class="nt-notes">' + notes.map(function (n) {
+          return '<span class="nt-note" tabindex="0" data-label="' + esc(n.label) + '"><span class="nt-head"><span class="nt-arrow">ㄴ→</span>' + esc(n.label) + "</span>" +
+            '<span class="nt-text">' + n.html + "</span></span>";
+        }).join("") + "</div>" : "") +
+        "</li>";
+    }).join("");
+  }
+
+  // 파란 풀이는 평소엔 단어만 보이고 마우스를 올리면(탭하면) 뜬다. "풀이 펼치기"를 켜면 모두 펼쳐 보인다
+  var NOTES_KEY = "hanneung_notes_open";
+  function initNoteToggle() {
+    var btn = $("#note-toggle"), list = $("#concept-list");
+    var open = false;
+    try { open = localStorage.getItem(NOTES_KEY) === "1"; } catch (e) {}
+    function paint() {
+      list.classList.toggle("notes-open", open);
+      btn.classList.toggle("active", open);
+      btn.textContent = open ? "풀이 접기" : "풀이 펼치기";
+      btn.setAttribute("aria-pressed", open ? "true" : "false");
+    }
+    btn.addEventListener("click", function () {
+      open = !open;
+      try { localStorage.setItem(NOTES_KEY, open ? "1" : "0"); } catch (e) {}
+      paint();
+    });
+    paint();
   }
 
   function openConceptFor(p) {
@@ -1041,6 +1116,7 @@
   initGlossary();
   initTabs();
   initConcept();
+  initNoteToggle();
   initQuiz();
   initWrong();
   initTimeline();
