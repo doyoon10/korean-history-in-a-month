@@ -44,6 +44,31 @@
     if (typeof v === "string") return v;
     return v[era] || v["*"] || null;
   }
+  // "종류|쉬운 뜻" → {type, desc}
+  function splitDef(s) {
+    var i = s.indexOf("|");
+    return i < 0 ? { type: "", desc: s } : { type: s.slice(0, i), desc: s.slice(i + 1) };
+  }
+  // 라벨에 들어 있는 풀이 용어 중 가장 긴 것 (라벨 자체가 용어면 그것)
+  function glossInLabel(label, era) {
+    if (glossFor(label, era)) return label;
+    var best = null;
+    if (glossRe) label.replace(glossRe, function (m, at, str) {
+      if (!/[가-힣0-9]/.test(str.charAt(at - 1)) && glossFor(m, era) && (!best || m.length > best.length)) best = m;
+      return m;
+    });
+    return best;
+  }
+  // 괄호 속 시험용 조각을 읽기 쉽게: 1398 → 1398년, 4C → 4세기, BC 2333 → 기원전 2333년
+  function readable(t) {
+    return t.replace(/(\d{4})\.(\d{1,2})\.(\d{1,2})(?!\d)/g, "$1년 $2월 $3일")
+      .replace(/(\d{4})\.(\d{1,2})(?![\d.])/g, "$1년 $2월")
+      .replace(/\bBC\s?(\d+)C\b/g, "기원전 $1세기")
+      .replace(/\bBC\s?(\d+)/g, "기원전 $1년")
+      .replace(/(\d+)C(?![a-zA-Z])/g, "$1세기")
+      .replace(/(^|[^\d.~년])(\d{3,4})(?=$|[\s,·)~\-])/g, "$1$2년")
+      .replace(/(\d+)s(?![a-zA-Z])/g, "$1년대");
+  }
 
   // fmt()를 거친 HTML에서 용어를 찾아 풀이 표시를 붙인다. seen에 있는 용어는 건너뛴다(주제당 한 번)
   function linkTerms(html, era, seen) {
@@ -106,18 +131,25 @@
       return li && li.querySelector('.nt-note[data-k="' + el.dataset.k + '"]');
     }
     function show(el) {
-      var title, def;
+      var title, type = "", desc = "", detail = "";
       var note = (el.classList.contains("nt-note") || el.classList.contains("nt-mark")) && noteOf(el);
       if (note) {
         title = note.dataset.label;
-        def = note.querySelector(".nt-text").textContent;
+        type = note.querySelector(".nt-type").textContent;
+        desc = note.querySelector(".nt-desc").textContent;
+        detail = note.querySelector(".nt-detail").textContent;
       } else {
-        title = el.dataset.term;
-        def = glossFor(el.dataset.term, el.dataset.era);
+        var d = glossFor(el.dataset.term, el.dataset.era);
+        if (!d) return;
+        d = splitDef(d);
+        title = el.dataset.term; type = d.type; desc = d.desc;
       }
-      if (!def) return;
+      if (!desc && !detail) return;
       cur = el;
-      pop.innerHTML = "<b>" + esc(title) + "</b>" + esc(def);
+      pop.innerHTML = '<div class="gp-head">' + (type ? '<span class="gp-type">' + esc(type) + "</span>" : "") +
+        '<span class="gp-title">' + esc(title) + "</span></div>" +
+        (desc ? '<div class="gp-desc">' + esc(desc) + "</div>" : "") +
+        (detail ? '<div class="gp-detail' + (desc ? "" : " only") + '">' + esc(detail) + "</div>" : "");
       pop.style.left = "0px";
       pop.style.top = "0px";
       pop.hidden = false;
@@ -491,11 +523,7 @@
     });
   }
 
-  // 손필기 모양: "주체 : 핵심어들" 한 줄 + 아래에 'ㄴ→ 용어 풀이' (괄호 설명 또는 용어 풀이)
-  function glossShort(def) {
-    var m = def.match(/^(.+?)\.\s/);
-    return m ? m[1] : def;
-  }
+  // 손필기 모양: "주체 : 핵심어들" 한 줄 + 아래에 'ㄴ→ 단어' (호버하면 종류·쉬운 뜻·괄호 속 참고)
   // ** 굵게와 줄바꿈(\n = ' / ')이 섞인 원문을 그리면서, 풀이가 달린 범위에 밑줄 span을 씌운다.
   // ranges: 굵게 표시를 뺀 글자 위치 기준 [{s, e, k}], 겹치지 않게 정렬된 상태
   function renderMarked(raw, ranges) {
@@ -541,40 +569,39 @@
   }
 
   function noteBulletsHtml(raw, era, seen) {
-    function toNote(n, at) {
-      return { label: n.label, html: linkTerms(fmt(n.text), era, seen), at: at,
-        short: window.noteStripStars(n.text).length <= 12 };
-    }
-    // 연도처럼 짧은 괄호 풀이에는 용어 뜻을 덧붙인다
-    function mergeGloss(notes, m, def) {
-      for (var i = 0; i < notes.length; i++) {
-        if (notes[i].label.indexOf(m) === -1) continue;
-        if (notes[i].short && !notes[i].merged) {
-          notes[i].html += " · " + esc(glossShort(def));
-          notes[i].merged = true;
-        }
-        return true;
+    // 괄호에서 온 풀이: 라벨에 든 용어의 쉬운 뜻 + 괄호 속 내용(참고)
+    function parenNote(n, at) {
+      var note = { label: n.label, at: at, detail: linkTerms(fmt(readable(n.text)), era, {}) };
+      var term = glossInLabel(n.label, era);
+      if (term) {
+        var d = splitDef(glossFor(term, era));
+        note.type = d.type;
+        note.desc = (term !== n.label ? term + " — " : "") + d.desc;
+        seen[term] = 1;
+        // 참고가 뜻에 이미 들어 있으면(연도 등) 반복하지 않는다
+        var bare = window.noteStripStars(n.text).replace(/\s/g, "");
+        if (note.desc.replace(/\s/g, "").indexOf(bare) !== -1) note.detail = "";
       }
-      return false;
+      return note;
+    }
+    function noteHtml(n, k) {
+      return '<span class="nt-note" tabindex="0" data-k="' + k + '" data-label="' + esc(n.label) + '">' +
+        '<span class="nt-head"><span class="nt-arrow">ㄴ→</span>' + esc(n.label) + "</span>" +
+        '<span class="nt-text"><span class="nt-type">' + esc(n.type || "") + "</span>" +
+        '<span class="nt-desc">' + esc(n.desc || "") + "</span>" +
+        '<span class="nt-detail">' + (n.detail || "") + "</span></span></span>";
     }
 
     return window.parseNote(raw).map(function (b) {
       var subjPlain = window.noteStripStars(b.subject);
-      var subjNotes = b.subjectNotes.map(function (n) { return toNote(n, -1); });
-      // 주체에 들어 있는 용어는 따로 풀지 않고, 주체의 짧은 괄호 풀이에만 뜻을 덧붙인다
-      if (glossRe && subjPlain) {
-        subjPlain.replace(glossRe, function (m) {
-          var def = !seen[m] && glossFor(m, era);
-          if (def) mergeGloss(subjNotes, m, def);
-          seen[m] = 1;
-          return m;
-        });
-      }
+      var subjNotes = b.subjectNotes.map(function (n) { return parenNote(n, -1); });
+      // 주체에 들어 있는 용어는 따로 풀지 않는다
+      if (glossRe && subjPlain) subjPlain.replace(glossRe, function (m) { seen[m] = 1; return m; });
 
       var joined = b.lines.join("\n");
       var plain = joined.replace(/\*\*/g, "");
       var notes = b.notes.map(function (n) {
-        return toNote(n, joined.slice(0, n.at).replace(/\*\*/g, "").length);
+        return parenNote(n, joined.slice(0, n.at).replace(/\*\*/g, "").length);
       });
       if (glossRe) {
         plain.replace(glossRe, function (m, at, str) {
@@ -582,8 +609,10 @@
           var def = glossFor(m, era);
           if (!def) return m;
           seen[m] = 1;
-          // 괄호 풀이가 이미 붙은 용어면 거기에 합친다
-          if (!mergeGloss(notes, m, def)) notes.push({ label: m, html: esc(glossShort(def)), at: at, gloss: true });
+          // 이미 괄호 풀이가 붙은 라벨 안의 용어면 건너뛴다
+          if (notes.some(function (n) { return n.label.indexOf(m) !== -1; })) return m;
+          var d = splitDef(def);
+          notes.push({ label: m, type: d.type, desc: d.desc, at: at, gloss: true });
           return m;
         });
       }
@@ -595,10 +624,7 @@
       return '<li class="nt"><div class="nt-main">' +
         (b.subject ? '<span class="nt-subj">' + renderMarked(b.subject, subjRanges) + '</span><span class="nt-colon"> : </span>' : "") +
         renderMarked(joined, bodyRanges) + "</div>" +
-        (notes.length ? '<div class="nt-notes">' + notes.map(function (n, k) {
-          return '<span class="nt-note" tabindex="0" data-k="' + k + '" data-label="' + esc(n.label) + '"><span class="nt-head"><span class="nt-arrow">ㄴ→</span>' + esc(n.label) + "</span>" +
-            '<span class="nt-text">' + n.html + "</span></span>";
-        }).join("") + "</div>" : "") +
+        (notes.length ? '<div class="nt-notes">' + notes.map(noteHtml).join("") + "</div>" : "") +
         "</li>";
     }).join("");
   }
