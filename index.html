@@ -120,6 +120,10 @@
     <div class="reader">
       <aside class="toc">
         <button class="toc-toggle" id="toc-toggle" type="button" aria-expanded="false"><span>목차</span><b id="toc-current"></b><i>▾</i></button>
+        <div class="toc-head">
+          <span>목차</span>
+          <button class="toc-hide" id="toc-hide" type="button" title="목차를 접고 본문을 넓게">« 접기</button>
+        </div>
         <div class="toc-top">
           <input type="search" id="concept-search" placeholder="키워드 검색 (예: 대동법, 신간회)">
         </div>
@@ -127,7 +131,10 @@
       </aside>
       <article class="reader-main">
         <div class="reader-tools">
-          <span class="topic-crumb" id="concept-crumb"></span>
+          <div class="reader-tools-l">
+            <button class="mini toc-show" id="toc-show" type="button" title="목차 펼치기">목차 »</button>
+            <span class="topic-crumb" id="concept-crumb"></span>
+          </div>
           <button class="mini" id="note-toggle" type="button" aria-pressed="false">풀이 펼치기</button>
         </div>
         <div id="concept-list"></div>

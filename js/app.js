@@ -480,7 +480,7 @@
 
   // ---------- 개념 ----------
   // 왼쪽 목차에서 고른 한 주제만 오른쪽에 크게 보여 준다. 마지막으로 본 주제를 기억한다
-  var CONCEPT_KEY = "hanneung_concept_cur";
+  var CONCEPT_KEY = "hanneung_concept_cur", TOC_KEY = "hanneung_toc_hidden";
   var TOPICS = [];
   (window.CONCEPTS || []).forEach(function (era) {
     era.topics.forEach(function (t) { TOPICS.push({ t: t, era: era }); });
@@ -505,6 +505,12 @@
       if (b) pickTopic(b.dataset.go);
     });
     $("#toc-toggle").addEventListener("click", function () { setTocOpen(!$(".reader").classList.contains("toc-open")); });
+    // 넓은 화면: 목차를 접으면 본문이 넓어진다. 접은 상태를 기억한다
+    var hidden = false;
+    try { hidden = localStorage.getItem(TOC_KEY) === "1"; } catch (e) {}
+    $(".reader").classList.toggle("toc-hidden", hidden);
+    $("#toc-hide").addEventListener("click", function () { setTocHidden(true); });
+    $("#toc-show").addEventListener("click", function () { setTocHidden(false); renderToc(); });
     // 키보드 ← → 로 이전·다음 주제
     document.addEventListener("keydown", function (e) {
       if (!$("#view-concept").classList.contains("active") || e.metaKey || e.ctrlKey || e.altKey) return;
@@ -516,6 +522,10 @@
     renderConcept();
   }
 
+  function setTocHidden(on) {
+    $(".reader").classList.toggle("toc-hidden", on);
+    try { localStorage.setItem(TOC_KEY, on ? "1" : "0"); } catch (e) {}
+  }
   function setTocOpen(on) {
     $(".reader").classList.toggle("toc-open", on);
     $("#toc-toggle").setAttribute("aria-expanded", on ? "true" : "false");
