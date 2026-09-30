@@ -1836,7 +1836,7 @@
   // 휴대폰 주소창 색도 테마에 맞춘다
   function paintMetaColor() {
     var m = document.querySelector('meta[name="theme-color"]');
-    if (m) m.setAttribute("content", currentTheme() === "dark" ? "#141210" : "#f4efe6");
+    if (m) m.setAttribute("content", currentTheme() === "dark" ? "#131416" : "#8b1e2d");
   }
 
   // 전환 효과: 최신 브라우저는 화면 전체를 부드럽게 겹쳐 바꾸고,
