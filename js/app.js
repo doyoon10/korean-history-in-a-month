@@ -234,6 +234,11 @@
     window.scrollTo(0, 0);
     if (name === "dash") renderDash();
     if (name === "wrong") renderWrong();
+    if (name !== "mock") return stopMockTimer();
+    // 푸는 중이면 타이머만 다시 돌리고, 결과 화면은 그대로 두고, 나머지는 회차 목록을 새로 그린다
+    if (!$("#mock-run").classList.contains("hidden") && mockState().cur) {
+      tickMock(); stopMockTimer(); mockTimer = setInterval(tickMock, 1000);
+    } else if ($("#mock-result").classList.contains("hidden")) renderMockPick();
   }
 
   // ---------- 대시보드 ----------
@@ -947,6 +952,340 @@
     });
   }
 
+  // ---------- 실전 기출 (공식 문제지 + 답안지 채점) ----------
+  // 문제지 PDF는 사용자가 고른 파일을 이 기기(IndexedDB)에만 보관한다. 서버로 올리지 않는다.
+  var EXAMS = window.EXAMS || [];
+  var EXAM_URL = "https://www.historyexam.go.kr/pst/list.do?bbs=dat";
+  var EXAM_SECS = 80 * 60;
+  var CIRCLED = ["①", "②", "③", "④", "⑤"];
+  var TOPIC_ERA = {};
+  (window.CONCEPTS || []).forEach(function (e) { e.topics.forEach(function (t) { TOPIC_ERA[t.id] = e.id; }); });
+  var mockTimer = null, mockUrl = null;
+
+  function mockState() {
+    if (!S.mock) S.mock = { cur: null, hist: {} };
+    return S.mock;
+  }
+  function examByRound(r) {
+    for (var i = 0; i < EXAMS.length; i++) if (EXAMS[i].round === r) return EXAMS[i];
+    return null;
+  }
+  function tagEra(tag) { return TOPIC_ERA[tag[0]] || tag[0]; }
+  function gradeOf(score) {
+    return score >= 80 ? "1급" : score >= 70 ? "2급" : score >= 60 ? "3급" : "불합격";
+  }
+  function clock(secs) {
+    var s = Math.abs(Math.round(secs));
+    var m = Math.floor(s / 60), r = s % 60;
+    return m + ":" + (r < 10 ? "0" : "") + r;
+  }
+  function score(ex, ans) {
+    var pts = 0, right = 0;
+    for (var i = 0; i < 50; i++) if (ans[i] === +ex.ans[i]) { pts += +ex.pts[i]; right++; }
+    return { pts: pts, right: right };
+  }
+
+  // 문제지 PDF 보관 (브라우저 IndexedDB, 이 기기 안에서만)
+  function pdfDb(cb) {
+    try {
+      var rq = indexedDB.open("hanneung_pdf", 1);
+      rq.onupgradeneeded = function () { rq.result.createObjectStore("files"); };
+      rq.onsuccess = function () { cb(rq.result); };
+      rq.onerror = function () { cb(null); };
+    } catch (e) { cb(null); }
+  }
+  function pdfGet(round, cb) {
+    pdfDb(function (db) {
+      if (!db) return cb(null);
+      try {
+        var g = db.transaction("files").objectStore("files").get(String(round));
+        g.onsuccess = function () { cb(g.result || null); };
+        g.onerror = function () { cb(null); };
+      } catch (e) { cb(null); }
+    });
+  }
+  function pdfPut(round, blob, done) {
+    pdfDb(function (db) {
+      if (!db) return done && done(false);
+      try {
+        var tx = db.transaction("files", "readwrite");
+        tx.objectStore("files").put(blob, String(round));
+        tx.oncomplete = function () { done && done(true); };
+        tx.onerror = function () { done && done(false); };
+      } catch (e) { done && done(false); }
+    });
+  }
+  function pdfKeys(cb) {
+    pdfDb(function (db) {
+      if (!db) return cb([]);
+      try {
+        var g = db.transaction("files").objectStore("files").getAllKeys();
+        g.onsuccess = function () { cb(g.result || []); };
+        g.onerror = function () { cb([]); };
+      } catch (e) { cb([]); }
+    });
+  }
+
+  function showMockPart(part) {
+    ["pick", "run", "result"].forEach(function (p) { $("#mock-" + p).classList.toggle("hidden", p !== part); });
+    if (part !== "run") stopMockTimer();
+  }
+  function stopMockTimer() {
+    if (mockTimer) { clearInterval(mockTimer); mockTimer = null; }
+  }
+
+  function renderMockPick() {
+    showMockPart("pick");
+    var M = mockState();
+    var host = $("#mock-pick");
+    var rows = EXAMS.map(function (ex) {
+      var hist = M.hist[ex.round] || [];
+      var best = hist.reduce(function (b, h) { return Math.max(b, h.score); }, -1);
+      var going = M.cur && M.cur.round === ex.round;
+      return '<div class="mock-row" data-round="' + ex.round + '">' +
+        '<div class="mock-row-main"><b>제' + ex.round + '회</b><span class="mock-date">' + ex.date.replace(/-/g, ".") + "</span>" +
+        '<span class="mock-pdf-badge hidden">PDF 있음</span></div>' +
+        '<div class="mock-row-score">' + (best >= 0 ? "최고 <b>" + best + "점</b> · " + gradeOf(best) + " · " + hist.length + "회 응시" : "아직 안 풀었음") + "</div>" +
+        '<div class="mock-row-btns">' +
+        (going ? '<button class="mini active" data-act="resume">이어 풀기</button>' : "") +
+        '<button class="mini' + (going ? "" : " active") + '" data-act="start">' + (going ? "처음부터" : "풀기") + "</button>" +
+        (hist.length ? '<button class="mini" data-act="last">지난 결과</button>' : "") +
+        "</div></div>";
+    }).join("");
+    host.innerHTML =
+      '<div class="card mock-guide"><h2>이렇게 푸세요</h2><ol>' +
+      '<li><a href="' + EXAM_URL + '" target="_blank" rel="noopener">한국사능력검정시험 시험 자료실</a>에서 풀 회차의 <b>심화 문제지 PDF</b>를 받아 둡니다.</li>' +
+      "<li>아래에서 회차를 고르고, 화면의 <b>문제지 PDF 열기</b>로 받은 파일을 고릅니다. 한 번 고르면 이 기기에 저장되어 다음부터는 바로 열립니다.</li>" +
+      "<li>문제지를 보면서 오른쪽 답안지에 번호를 찍고 <b>제출</b>하면 공식 정답표로 채점합니다.</li></ol>" +
+      '<p class="mock-note">문제지는 국사편찬위원회 저작물이라 이 사이트에는 올리지 않습니다. 고른 PDF는 서버로 가지 않고 이 브라우저 안에서만 열립니다. 정답·배점은 공식 정답표 기준입니다.</p></div>' +
+      '<div class="card"><h2>회차 고르기 <small>심화</small></h2><div class="mock-rows">' + rows + "</div></div>";
+
+    pdfKeys(function (keys) {
+      keys.forEach(function (k) {
+        var row = host.querySelector('.mock-row[data-round="' + k + '"] .mock-pdf-badge');
+        if (row) row.classList.remove("hidden");
+      });
+    });
+    $$(".mock-row button", host).forEach(function (b) {
+      b.addEventListener("click", function () {
+        var r = +b.closest(".mock-row").dataset.round;
+        var act = b.dataset.act;
+        if (act === "resume") return startMock(r, false);
+        if (act === "last") {
+          var h = mockState().hist[r];
+          return renderMockResult(r, h[h.length - 1]);
+        }
+        if (M.cur && M.cur.round === r && M.cur.ans.some(function (a) { return a; }) &&
+            !confirm("찍어 둔 답을 지우고 처음부터 풀까요?")) return;
+        startMock(r, true);
+      });
+    });
+  }
+
+  function startMock(round, fresh) {
+    var M = mockState();
+    if (fresh || !M.cur || M.cur.round !== round) {
+      M.cur = { round: round, ans: [], start: Date.now() };
+      for (var i = 0; i < 50; i++) M.cur.ans.push(0);
+      save();
+    }
+    renderMockRun();
+  }
+
+  function renderMockRun() {
+    var M = mockState(), cur = M.cur, ex = examByRound(cur.round);
+    showMockPart("run");
+    document.documentElement.style.setProperty("--topbar-h", ($(".topbar") || { offsetHeight: 0 }).offsetHeight + "px");
+    var host = $("#mock-run");
+    var omr = "";
+    for (var i = 0; i < 50; i++) {
+      omr += '<div class="omr-row" data-q="' + i + '"><span class="omr-n">' + (i + 1) + "</span>";
+      for (var c = 1; c <= 5; c++) {
+        omr += '<button type="button" class="omr-b' + (cur.ans[i] === c ? " on" : "") + '" data-c="' + c + '" aria-label="' +
+          (i + 1) + "번 " + c + '번">' + c + "</button>";
+      }
+      omr += "</div>";
+    }
+    host.innerHTML =
+      '<div class="mock-bar">' +
+      '<div class="mock-title">제' + ex.round + "회 심화</div>" +
+      '<div class="mock-clock" id="mock-clock">80:00</div>' +
+      '<div class="mock-count" id="mock-count"></div>' +
+      '<div class="mock-bar-btns"><button class="mini" id="mock-quit">나가기</button>' +
+      '<button class="primary small" id="mock-submit">제출하고 채점</button></div></div>' +
+      '<div class="mock-grid">' +
+      '<div class="mock-paper" id="mock-paper"></div>' +
+      '<div class="mock-omr"><div class="omr-head">답안지 <small>번호를 누르세요 · 다시 누르면 지워짐</small></div>' +
+      '<div class="omr-list">' + omr + "</div></div></div>";
+
+    $$(".omr-b", host).forEach(function (b) {
+      b.addEventListener("click", function () {
+        var q = +b.closest(".omr-row").dataset.q, c = +b.dataset.c;
+        cur.ans[q] = cur.ans[q] === c ? 0 : c;
+        $$(".omr-b", b.parentNode).forEach(function (x) { x.classList.toggle("on", +x.dataset.c === cur.ans[q]); });
+        save(); paintMockCount();
+      });
+    });
+    $("#mock-quit").addEventListener("click", function () { renderMockPick(); });
+    $("#mock-submit").addEventListener("click", function () {
+      var blank = cur.ans.filter(function (a) { return !a; }).length;
+      if (!confirm(blank ? "아직 " + blank + "문항에 답이 없습니다. 이대로 제출할까요?" : "제출하고 채점할까요?")) return;
+      submitMock();
+    });
+
+    paintMockCount();
+    tickMock();
+    stopMockTimer();
+    mockTimer = setInterval(tickMock, 1000);
+    loadMockPaper(cur.round);
+  }
+
+  function paintMockCount() {
+    var cur = mockState().cur, el = $("#mock-count");
+    if (!cur || !el) return;
+    el.textContent = "답 " + cur.ans.filter(function (a) { return a; }).length + "/50";
+  }
+  function tickMock() {
+    var cur = mockState().cur, el = $("#mock-clock");
+    if (!cur || !el) return stopMockTimer();
+    var left = EXAM_SECS - (Date.now() - cur.start) / 1000;
+    el.textContent = left >= 0 ? clock(left) : "+" + clock(left) + " 초과";
+    el.classList.toggle("warn", left < 10 * 60 && left >= 0);
+    el.classList.toggle("over", left < 0);
+  }
+
+  function loadMockPaper(round) {
+    var host = $("#mock-paper");
+    if (mockUrl) { URL.revokeObjectURL(mockUrl); mockUrl = null; }
+    var picker = '<label class="mini mock-file">문제지 PDF 열기<input type="file" accept="application/pdf,.pdf" hidden></label>';
+    pdfGet(round, function (blob) {
+      if (!document.body.contains(host)) return;
+      if (blob) {
+        mockUrl = URL.createObjectURL(blob);
+        host.innerHTML = '<div class="paper-tools">' +
+          '<a class="mini" href="' + mockUrl + '" target="_blank" rel="noopener">새 창에서 보기</a>' +
+          picker.replace("문제지 PDF 열기", "다른 파일로 바꾸기") + "</div>" +
+          '<iframe class="paper-frame" src="' + mockUrl + '#navpanes=0&view=FitH" title="제' + round + '회 문제지"></iframe>';
+      } else {
+        host.innerHTML = '<div class="paper-empty">' +
+          "<p><b>제" + round + "회 심화 문제지 PDF</b>를 열어 주세요.</p>" + picker +
+          '<p class="mock-note">아직 없다면 <a href="' + EXAM_URL + '" target="_blank" rel="noopener">시험 자료실</a>에서 받으세요. ' +
+          "고른 파일은 이 기기에만 저장되고, 다음부터는 바로 열립니다.</p>" +
+          '<p class="mock-note">종이에 인쇄해서 풀어도 됩니다. 답안지와 타이머는 그대로 쓰면 됩니다.</p></div>';
+      }
+      var input = host.querySelector('input[type="file"]');
+      input.addEventListener("change", function () {
+        var f = input.files && input.files[0];
+        if (!f) return;
+        var m = f.name.match(/(\d{2,3})\s*회/);
+        if (m && +m[1] !== round && !confirm("파일 이름에는 제" + m[1] + "회라고 되어 있습니다. 제" + round + "회 문제지로 쓸까요?")) return;
+        var pdf = f.type === "application/pdf" ? f : new Blob([f], { type: "application/pdf" });
+        pdfPut(round, pdf, function (ok) {
+          if (!ok) {
+            // 저장이 막힌 브라우저(사생활 보호 모드 등)에서는 이번에만 연다
+            mockUrl = URL.createObjectURL(pdf);
+            host.innerHTML = '<div class="paper-tools"><a class="mini" href="' + mockUrl + '" target="_blank" rel="noopener">새 창에서 보기</a></div>' +
+              '<iframe class="paper-frame" src="' + mockUrl + '#navpanes=0&view=FitH" title="문제지"></iframe>';
+            return;
+          }
+          loadMockPaper(round);
+        });
+      });
+    });
+  }
+
+  function submitMock() {
+    var M = mockState(), cur = M.cur, ex = examByRound(cur.round);
+    var sc = score(ex, cur.ans);
+    var rec = { at: todayStr(), score: sc.pts, right: sc.right,
+      secs: Math.round((Date.now() - cur.start) / 1000), ans: cur.ans.join("") };
+    (M.hist[cur.round] = M.hist[cur.round] || []).push(rec);
+    M.cur = null;
+    save();
+    renderMockResult(ex.round, rec);
+  }
+
+  function renderMockResult(round, rec) {
+    showMockPart("result");
+    var ex = examByRound(round);
+    var ans = rec.ans.split("").map(Number);
+    var byEra = {}, wrong = [];
+    for (var i = 0; i < 50; i++) {
+      var tag = ex.tags[i], era = tagEra(tag), p = +ex.pts[i], ok = ans[i] === +ex.ans[i];
+      var b = byEra[era] = byEra[era] || { got: 0, all: 0, n: 0, ok: 0 };
+      b.all += p; b.n++;
+      if (ok) { b.got += p; b.ok++; }
+      else wrong.push(i);
+    }
+    var eraOrder = (window.CONCEPTS || []).map(function (e) { return e.id; });
+    var eraRows = eraOrder.filter(function (e) { return byEra[e]; }).map(function (e) {
+      var b = byEra[e], pct = Math.round(b.got / b.all * 100);
+      return '<div class="mock-era"><span class="mock-era-name">' + esc(ERA_NAMES[e] || e) + "</span>" +
+        '<div class="bar"><i style="width:' + pct + '%"></i></div>' +
+        '<span class="mock-era-num">' + b.ok + "/" + b.n + "문항 · " + b.got + "/" + b.all + "점</span></div>";
+    }).join("");
+    var wrongRows = wrong.map(function (i) {
+      var tag = ex.tags[i], era = tagEra(tag), hasTopic = !!TOPIC_ERA[tag[0]];
+      return '<div class="mock-wrong">' +
+        '<span class="mock-wq">' + (i + 1) + "번</span>" +
+        '<span class="mock-wtag"><span class="q-tag">' + esc(ERA_NAMES[era] || era) + "</span> " + esc(tag[1]) + "</span>" +
+        '<span class="mock-wans">' + (ans[i] ? "내 답 " + CIRCLED[ans[i] - 1] : "무응답") +
+        " → 정답 <b>" + CIRCLED[+ex.ans[i] - 1] + "</b> · " + ex.pts[i] + "점</span>" +
+        (hasTopic ? '<button class="mini" data-topic="' + tag[0] + '">개념 보기</button>' : "") + "</div>";
+    }).join("");
+    var hist = mockState().hist[round] || [];
+    var over = rec.secs > EXAM_SECS;
+    $("#mock-result").innerHTML =
+      '<div class="card mock-score"><div class="mock-score-top">' +
+      '<div><div class="mock-score-num">' + rec.score + '<small>점</small></div>' +
+      '<div class="mock-grade g-' + (rec.score >= 60 ? "pass" : "fail") + '">' + gradeOf(rec.score) + "</div></div>" +
+      '<div class="mock-score-meta">제' + round + "회 심화 · " + rec.at + "<br>맞힌 문항 " + rec.right + "/50<br>걸린 시간 " +
+      Math.floor(rec.secs / 60) + "분 " + (rec.secs % 60) + "초" + (over ? ' <span class="over">(80분 초과)</span>' : "") + "</div></div>" +
+      (hist.length > 1 ? '<div class="mock-hist">이 회차 기록 · ' + hist.map(function (h) { return h.score + "점"; }).join(" → ") + "</div>" : "") +
+      '<div class="btn-group" style="margin-top:14px"><button class="mini active" id="mock-again">다시 풀기</button>' +
+      '<button class="mini" id="mock-back">회차 목록</button></div></div>' +
+      '<div class="card"><h2>시대별 점수</h2>' + eraRows + "</div>" +
+      '<div class="card"><h2>틀린 문제 <small>' + wrong.length + "문항</small></h2>" +
+      (wrong.length ? '<p class="mock-note">문제지에서 번호를 찾아 다시 보고, 헷갈린 개념은 "개념 보기"로 바로 확인하세요. 오답 노트 탭에도 모아 둡니다.</p>' + wrongRows
+        : '<p class="empty">다 맞혔습니다!</p>') + "</div>";
+    $("#mock-again").addEventListener("click", function () { startMock(round, true); });
+    $("#mock-back").addEventListener("click", renderMockPick);
+    bindTopicButtons($("#mock-result"));
+    window.scrollTo(0, 0);
+  }
+
+  function bindTopicButtons(root) {
+    $$("button[data-topic]", root).forEach(function (b) {
+      b.addEventListener("click", function () { openConceptFor({ concepts: [b.dataset.topic] }); });
+    });
+  }
+
+  // 오답 노트에 붙일 실전 기출 오답 (회차마다 가장 최근 응시 기준)
+  function mockWrongHtml() {
+    var M = mockState(), out = "";
+    EXAMS.forEach(function (ex) {
+      var hist = M.hist[ex.round];
+      if (!hist || !hist.length) return;
+      var rec = hist[hist.length - 1], ans = rec.ans.split("").map(Number), rows = "";
+      for (var i = 0; i < 50; i++) {
+        if (ans[i] === +ex.ans[i]) continue;
+        var tag = ex.tags[i], era = tagEra(tag);
+        rows += '<div class="mock-wrong"><span class="mock-wq">' + (i + 1) + "번</span>" +
+          '<span class="mock-wtag"><span class="q-tag">' + esc(ERA_NAMES[era] || era) + "</span> " + esc(tag[1]) + "</span>" +
+          '<span class="mock-wans">' + (ans[i] ? "내 답 " + CIRCLED[ans[i] - 1] : "무응답") + " → 정답 <b>" + CIRCLED[+ex.ans[i] - 1] + "</b></span>" +
+          (TOPIC_ERA[tag[0]] ? '<button class="mini" data-topic="' + tag[0] + '">개념 보기</button>' : "") + "</div>";
+      }
+      if (rows) out += '<div class="card mock-wrong-card"><h2>실전 기출 제' + ex.round + "회 <small>" + rec.at + " · " + rec.score + "점</small></h2>" + rows + "</div>";
+    });
+    return out;
+  }
+
+  function initMock() {
+    $$("[data-goto]").forEach(function (b) {
+      b.addEventListener("click", function () { showView(b.dataset.goto); });
+    });
+  }
+
   // ---------- 오답 노트 ----------
   function qById(id) {
     var list = window.QUIZ || [];
@@ -956,11 +1295,14 @@
 
   function renderWrong() {
     var host = $("#wrong-list");
+    var mockHtml = mockWrongHtml();
     if (!S.wrong.length) {
-      host.innerHTML = '<p class="empty">아직 오답이 없습니다. 문제를 풀면 틀린 문항이 여기 쌓입니다.</p>';
+      host.innerHTML = mockHtml + '<p class="empty">' + (mockHtml ? "연습 문제 오답은 아직 없습니다." :
+        "아직 오답이 없습니다. 문제를 풀면 틀린 문항이 여기 쌓입니다.") + "</p>";
+      bindTopicButtons(host);
       return;
     }
-    host.innerHTML = S.wrong.map(function (w) {
+    host.innerHTML = mockHtml + (mockHtml ? '<h2 class="wrong-sub">연습 문제 오답</h2>' : "") + S.wrong.map(function (w) {
       var q = qById(w.id);
       if (!q) return "";
       return '<div class="wrong-item">' +
@@ -971,6 +1313,7 @@
         '<div class="wrong-mine">내 답 ' + (w.mine + 1) + "번 · " + esc(q.choices[w.mine]) + "</div>" +
         '<div class="wrong-ex">' + linkTerms(esc(q.explain), q.era, {}) + '<div class="ex-kw" style="margin-top:6px;font-size:12px">핵심어 · ' + esc(q.keyword) + "</div></div></div>";
     }).join("");
+    bindTopicButtons(host);
   }
 
   function initWrong() {
@@ -987,7 +1330,7 @@
       renderQuestion();
     });
     $("#wrong-clear").addEventListener("click", function () {
-      if (!confirm("오답 노트를 모두 비울까요?")) return;
+      if (!confirm("연습 문제 오답을 모두 비울까요? (실전 기출 점수 기록은 그대로 남습니다)")) return;
       S.wrong = []; save(); renderWrong();
     });
   }
@@ -1263,6 +1606,7 @@
   initNoteToggle();
   initQuiz();
   initWrong();
+  initMock();
   initTimeline();
   initReset();
   initPlanCourse();

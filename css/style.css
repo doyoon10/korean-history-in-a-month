@@ -513,3 +513,87 @@ html.theme-vt::view-transition-new(root){animation-name:theme-fade-in}
 .notes-open .nt-text .nt-type:empty{display:none}
 .notes-open .nt-text .nt-detail{color:var(--ink-soft);margin-left:6px}
 .notes-open .nt-text .nt-desc:not(:empty)+.nt-detail::before{content:"· "}
+
+/* ---------- 실전 기출 ---------- */
+main:has(#view-mock.active #mock-run:not(.hidden)){max-width:1360px}
+#view-mock:has(#mock-run:not(.hidden)) .view-head{display:none}
+.card h2 small{font-weight:500;color:var(--ink-soft);font-size:12px;margin-left:4px}
+.mock-guide ol{margin:0 0 10px;padding-left:20px;font-size:14px;line-height:1.8}
+.mock-guide a,.paper-empty a{color:var(--accent);font-weight:600}
+.mock-note{font-size:12.5px;color:var(--ink-soft);line-height:1.6;margin:6px 0 0}
+.mock-rows{display:flex;flex-direction:column;gap:8px}
+.mock-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;border:1px solid var(--line);border-radius:11px;padding:10px 12px}
+.mock-row-main{display:flex;align-items:baseline;gap:8px;min-width:170px}
+.mock-row-main b{font-size:15px}
+.mock-date{font-size:12px;color:var(--ink-soft)}
+.mock-pdf-badge{font-size:11px;background:var(--ok-bg);color:var(--green);padding:1px 7px;border-radius:6px;font-weight:600}
+.mock-row-score{flex:1;font-size:13px;color:var(--ink-soft);min-width:150px}
+.mock-row-score b{color:var(--ink)}
+.mock-row-btns{display:flex;gap:6px}
+
+.mock-bar{position:sticky;top:var(--topbar-h,0px);z-index:20;display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  background:var(--bg);padding:8px 0 10px;margin-bottom:6px}
+.mock-title{font-weight:700;font-size:15px}
+.mock-clock{font-variant-numeric:tabular-nums;font-size:22px;font-weight:800;letter-spacing:-.5px;color:var(--ink)}
+.mock-clock.warn{color:var(--orange)}
+.mock-clock.over{color:var(--bad);font-size:17px}
+.mock-count{font-size:13px;color:var(--ink-soft)}
+.mock-bar-btns{margin-left:auto;display:flex;gap:8px;align-items:center}
+.primary.small{padding:8px 14px;font-size:13.5px}
+
+.mock-grid{display:grid;grid-template-columns:minmax(0,1fr) 384px;gap:14px;
+  height:calc(100vh - var(--topbar-h,110px) - 70px);min-height:520px}
+.mock-paper{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;display:flex;flex-direction:column;min-height:0}
+.paper-tools{display:flex;gap:8px;padding:8px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.paper-frame{flex:1;width:100%;border:0;min-height:0;background:#fff}
+.paper-empty{margin:auto;padding:30px 24px;text-align:center;max-width:420px}
+.paper-empty p{margin:0 0 12px;font-size:14px}
+.mock-file{display:inline-block;cursor:pointer}
+.paper-empty .mock-file{background:var(--accent-fill);border-color:var(--accent-fill);color:#fff;font-weight:600;padding:10px 18px;font-size:14px;margin-bottom:14px}
+.mock-omr{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);display:flex;flex-direction:column;min-height:0}
+.omr-head{padding:10px 12px;border-bottom:1px solid var(--line);font-weight:700;font-size:14px}
+.omr-head small{display:block;font-weight:400;font-size:11.5px;color:var(--ink-soft);margin-top:1px}
+.omr-list{overflow:auto;padding:8px 10px 12px;display:grid;grid-template-rows:repeat(25,auto);grid-auto-flow:column;gap:3px 12px;align-content:start}
+.omr-row{display:flex;align-items:center;gap:3px}
+.omr-n{width:22px;flex:none;text-align:right;font-size:12px;font-weight:700;color:var(--ink-soft);font-variant-numeric:tabular-nums;margin-right:3px}
+.omr-b{width:26px;height:26px;border-radius:50%;border:1.5px solid var(--line-strong);background:var(--card);
+  font-size:11.5px;color:var(--ink-soft);padding:0;line-height:1;font-variant-numeric:tabular-nums}
+.omr-b:hover{border-color:var(--ink-soft)}
+.omr-b.on{background:var(--ink);border-color:var(--ink);color:var(--card);font-weight:700}
+
+.mock-score-top{display:flex;align-items:center;gap:22px;flex-wrap:wrap}
+.mock-score-num{font-size:44px;font-weight:800;letter-spacing:-1.5px;line-height:1}
+.mock-score-num small{font-size:18px;font-weight:600;margin-left:2px}
+.mock-grade{display:inline-block;margin-top:6px;font-size:13px;font-weight:700;padding:2px 10px;border-radius:7px}
+.mock-grade.g-pass{background:var(--ok-bg);color:var(--green)}
+.mock-grade.g-fail{background:var(--bad-bg);color:var(--bad)}
+.mock-score-meta{font-size:13.5px;color:var(--ink-soft);line-height:1.7}
+.mock-score-meta .over{color:var(--bad)}
+.mock-hist{margin-top:10px;font-size:13px;color:var(--ink-soft)}
+.mock-era{display:grid;grid-template-columns:110px 1fr 150px;align-items:center;gap:10px;font-size:13px;margin-bottom:4px}
+.mock-era .bar{margin:0}
+.mock-era-num{color:var(--ink-soft);font-variant-numeric:tabular-nums;text-align:right}
+.mock-wrong{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:9px 0;border-top:1px solid var(--line);font-size:13.5px}
+.mock-wrong:first-of-type{border-top:0}
+.mock-wq{font-weight:800;width:38px;flex:none;font-variant-numeric:tabular-nums}
+.mock-wtag{flex:1;min-width:180px}
+.mock-wans{color:var(--ink-soft)}
+.mock-wans b{color:var(--green)}
+.mock-wrong .mini{padding:4px 10px;font-size:12px}
+.wrong-sub{font-size:15px;margin:22px 0 12px}
+
+@media (max-width:860px){
+  .mock-grid{grid-template-columns:1fr;height:auto}
+  .mock-paper{height:70vh}
+  .mock-paper:has(.paper-empty){height:auto}
+  .mock-bar-btns{margin-left:0}
+}
+@media (max-width:480px){
+  .omr-list{gap:3px 8px;padding:8px 6px 12px}
+  .omr-b{width:24px;height:24px;font-size:11px}
+  .omr-n{width:18px;font-size:11px}
+  .mock-era{grid-template-columns:1fr auto;gap:2px 8px;font-size:12.5px;margin-bottom:10px}
+  .mock-era .bar{grid-column:1 / -1;grid-row:2}
+  .mock-era-num{grid-column:2;grid-row:1}
+  .mock-score-num{font-size:38px}
+}
