@@ -234,10 +234,10 @@
     window.scrollTo(0, 0);
     if (name === "dash") renderDash();
     if (name === "wrong") renderWrong();
-    if (name !== "mock") return stopMockTimer();
-    // 푸는 중이면 타이머만 다시 돌리고, 결과 화면은 그대로 두고, 나머지는 회차 목록을 새로 그린다
+    if (name !== "mock") { pauseMock(); return stopMockTimer(); }
+    // 푸는 중이면 멈춘 상태 그대로 보여 주고(시작은 직접 누른다), 결과 화면은 그대로 두고, 나머지는 회차 목록을 새로 그린다
     if (!$("#mock-run").classList.contains("hidden") && mockState().cur) {
-      tickMock(); stopMockTimer(); mockTimer = setInterval(tickMock, 1000);
+      paintMockGate(); stopMockTimer(); mockTimer = setInterval(tickMock, 1000);
     } else if ($("#mock-result").classList.contains("hidden")) renderMockPick();
   }
 
@@ -1028,7 +1028,50 @@
 
   function showMockPart(part) {
     ["pick", "run", "result"].forEach(function (p) { $("#mock-" + p).classList.toggle("hidden", p !== part); });
-    if (part !== "run") stopMockTimer();
+    if (part !== "run") { pauseMock(); stopMockTimer(); }
+  }
+
+  // 시간은 '시작'을 누른 동안만 흐른다. elapsed = 지금까지 흐른 초, runSince = 흐르기 시작한 시각(멈춰 있으면 null)
+  function mockElapsed(cur) {
+    return (cur.elapsed || 0) + (cur.runSince ? (Date.now() - cur.runSince) / 1000 : 0);
+  }
+  function setMockRunning(on) {
+    var cur = mockState().cur;
+    if (!cur) return;
+    if (on && !cur.runSince) cur.runSince = Date.now();
+    if (!on && cur.runSince) { cur.elapsed = mockElapsed(cur); cur.runSince = null; }
+    save();
+    paintMockGate();
+  }
+  function pauseMock() {
+    var cur = mockState().cur;
+    if (cur && cur.runSince) setMockRunning(false);
+  }
+  // 멈춰 있으면 문제를 가리고 시작/계속하기 버튼을 보여 준다 (PDF 고르기와 보기 전환은 그대로 쓸 수 있다)
+  function paintMockGate() {
+    var cur = mockState().cur, run = $("#mock-run");
+    if (!cur || !run) return;
+    var on = !!cur.runSince, fresh = !on && !cur.elapsed;
+    run.classList.toggle("paused", !on);
+    var btn = $("#mock-go");
+    if (btn) {
+      btn.textContent = on ? "일시정지" : fresh ? "시작" : "계속하기";
+      btn.className = on ? "mini" : "primary small";
+    }
+    var body = $("#mock-paper .paper-body");
+    if (body) {
+      var g = body.querySelector(".mock-gate");
+      if (!g) { g = document.createElement("div"); g.className = "mock-gate"; body.appendChild(g); }
+      g.classList.toggle("hidden", on);
+      if (!on) {
+        g.innerHTML = '<div class="gate-box"><b>' + (fresh ? "준비되면 시작을 누르세요" : "일시정지 중") + "</b><p>" +
+          (fresh ? "누르는 순간부터 80분이 흐릅니다.<br>문제는 시작한 뒤에 보입니다."
+            : "남은 시간 " + clock(Math.max(0, EXAM_SECS - mockElapsed(cur))) + "<br>나가 있는 동안에는 시간이 흐르지 않습니다.") +
+          '</p><button class="primary">' + (fresh ? "시작" : "계속하기") + "</button></div>";
+        g.querySelector("button").addEventListener("click", function () { setMockRunning(true); });
+      }
+    }
+    tickMock();
   }
   function stopMockTimer() {
     if (mockTimer) { clearInterval(mockTimer); mockTimer = null; }
@@ -1045,7 +1088,8 @@
       return '<div class="mock-row" data-round="' + ex.round + '">' +
         '<div class="mock-row-main"><b>제' + ex.round + '회</b><span class="mock-date">' + ex.date.replace(/-/g, ".") + "</span>" +
         '<span class="mock-pdf-badge hidden">PDF 있음</span></div>' +
-        '<div class="mock-row-score">' + (best >= 0 ? "최고 <b>" + best + "점</b> · " + gradeOf(best) + " · " + hist.length + "회 응시" : "아직 안 풀었음") + "</div>" +
+        '<div class="mock-row-score">' + (going ? '<span class="mock-going">푸는 중 · 남은 시간 ' + clock(Math.max(0, EXAM_SECS - mockElapsed(M.cur))) + "</span><br>" : "") +
+        (best >= 0 ? "최고 <b>" + best + "점</b> · " + gradeOf(best) + " · " + hist.length + "회 응시" : "아직 안 풀었음") + "</div>" +
         '<div class="mock-row-btns">' +
         (going ? '<button class="mini active" data-act="resume">이어 풀기</button>' : "") +
         '<button class="mini' + (going ? "" : " active") + '" data-act="start">' + (going ? "처음부터" : "풀기") + "</button>" +
@@ -1056,6 +1100,7 @@
       '<div class="card mock-guide"><h2>이렇게 푸세요</h2><ol>' +
       '<li><a href="' + EXAM_URL + '" target="_blank" rel="noopener">한국사능력검정시험 시험 자료실</a>에서 풀 회차의 <b>심화 문제지 PDF</b>를 받아 둡니다.</li>' +
       "<li>아래에서 회차를 고르고, 화면의 <b>문제지 PDF 열기</b>로 받은 파일을 고릅니다. 한 번 고르면 이 기기에 저장되어 다음부터는 바로 열립니다.</li>" +
+      "<li><b>시작</b>을 눌러야 80분이 흐르기 시작합니다. 화면을 벗어나면 저절로 멈추고, 돌아와서 <b>계속하기</b>를 누르면 이어서 흐릅니다.</li>" +
       "<li>문제가 한 문제씩 크게 뜹니다. 아래 ①~⑤를 누르면 답이 찍히고 다음 문제로 넘어갑니다. 키보드는 <b>1~5</b>로 답, <b>← →</b>로 이동합니다.</li>" +
       "<li>다 풀면 <b>제출</b>을 누르세요. 공식 정답표로 채점하고, 틀린 문제는 그 자리에서 다시 볼 수 있습니다.</li></ol>" +
       '<p class="mock-note">문제지는 국사편찬위원회 저작물이라 이 사이트에는 올리지 않습니다. 고른 PDF는 서버로 가지 않고 이 브라우저 안에서만 열립니다. 정답·배점은 공식 정답표 기준입니다.</p></div>' +
@@ -1086,7 +1131,7 @@
   function startMock(round, fresh) {
     var M = mockState();
     if (fresh || !M.cur || M.cur.round !== round) {
-      M.cur = { round: round, ans: [], start: Date.now() };
+      M.cur = { round: round, ans: [], q: 0, elapsed: 0, runSince: null };
       for (var i = 0; i < 50; i++) M.cur.ans.push(0);
       save();
     }
@@ -1113,7 +1158,7 @@
       '<div class="mock-title">제' + ex.round + "회 심화</div>" +
       '<div class="mock-clock" id="mock-clock">80:00</div>' +
       '<div class="mock-count" id="mock-count"></div>' +
-      '<div class="mock-bar-btns"><button class="mini" id="mock-quit">나가기</button>' +
+      '<div class="mock-bar-btns"><button class="primary small" id="mock-go">시작</button><button class="mini" id="mock-quit">나가기</button>' +
       '<button class="primary small" id="mock-submit">제출하고 채점</button></div></div>' +
       '<div class="mock-grid">' +
       '<div class="mock-paper" id="mock-paper"></div>' +
@@ -1127,6 +1172,7 @@
       b.addEventListener("click", function () { goMock(+b.closest(".omr-row").dataset.q); });
     });
     $("#mock-quit").addEventListener("click", function () { renderMockPick(); });
+    $("#mock-go").addEventListener("click", function () { setMockRunning(!mockState().cur.runSince); });
     $("#mock-submit").addEventListener("click", function () {
       var blank = cur.ans.filter(function (a) { return !a; }).length;
       if (!confirm(blank ? "아직 " + blank + "문항에 답이 없습니다. 이대로 제출할까요?" : "제출하고 채점할까요?")) return;
@@ -1134,7 +1180,7 @@
     });
 
     paintMockCount();
-    tickMock();
+    paintMockGate();
     stopMockTimer();
     mockTimer = setInterval(tickMock, 1000);
     loadMockPaper(cur.round);
@@ -1148,16 +1194,19 @@
   function tickMock() {
     var cur = mockState().cur, el = $("#mock-clock");
     if (!cur || !el) return stopMockTimer();
-    var left = EXAM_SECS - (Date.now() - cur.start) / 1000;
+    // 흐르는 중이면 5초마다 저장해 둔다 (창이 갑자기 닫혀도 몇 초만 잃게)
+    if (cur.runSince && Date.now() - cur.runSince > 5000) { cur.elapsed = mockElapsed(cur); cur.runSince = Date.now(); save(); }
+    var left = EXAM_SECS - mockElapsed(cur);
     el.textContent = left >= 0 ? clock(left) : "+" + clock(left) + " 초과";
     el.classList.toggle("warn", left < 10 * 60 && left >= 0);
     el.classList.toggle("over", left < 0);
+    el.classList.toggle("paused", !cur.runSince);
   }
 
   // 답 고르기. fromOmr가 아니고 처음 고른 답이면 다음 문제로 넘어간다
   function pickMock(i, c, fromOmr) {
     var cur = mockState().cur;
-    if (!cur) return;
+    if (!cur || !cur.runSince) return;
     var first = !cur.ans[i];
     cur.ans[i] = cur.ans[i] === c ? 0 : c;
     save();
@@ -1313,6 +1362,7 @@
       mockUrl = URL.createObjectURL(blob);
       body.innerHTML = '<iframe class="paper-frame" src="' + mockUrl + '#navpanes=0&view=FitH" title="제' + round + '회 문제지"></iframe>' +
         '<a class="paper-open" href="' + mockUrl + '" target="_blank" rel="noopener">새 창에서 보기</a>';
+      paintMockGate();
       return;
     }
     body.innerHTML = '<div class="qv">' +
@@ -1327,6 +1377,7 @@
     $("#qv-prev").addEventListener("click", function () { goMock(M.cur.q - 1); });
     $("#qv-next").addEventListener("click", function () { goMock(M.cur.q + 1); });
     paintQv();
+    paintMockGate();
     openMockDoc(round, blob, function (doc) {
       if (!document.body.contains(body)) return;
       if (!doc) return showPaper(host, round, blob, true, "문제를 잘라 보여 주는 기능을 불러오지 못해 전체 문제지로 보여 줍니다. (인터넷 연결을 확인해 주세요)");
@@ -1376,7 +1427,7 @@
     var M = mockState(), cur = M.cur, ex = examByRound(cur.round);
     var sc = score(ex, cur.ans);
     var rec = { at: todayStr(), score: sc.pts, right: sc.right,
-      secs: Math.round((Date.now() - cur.start) / 1000), ans: cur.ans.join("") };
+      secs: Math.round(mockElapsed(cur)), ans: cur.ans.join("") };
     (M.hist[cur.round] = M.hist[cur.round] || []).push(rec);
     M.cur = null;
     save();
@@ -1462,6 +1513,15 @@
   }
 
   function initMock() {
+    // 예전 방식(시작 시각만 저장)으로 풀던 기록은 멈춘 상태로 바꾼다. 흐르던 채로 창이 닫혔어도 멈춤으로 연다
+    var M = mockState();
+    if (M.cur) {
+      if (M.cur.start != null) { M.cur.elapsed = 0; delete M.cur.start; }
+      M.cur.runSince = null;
+      save();
+    }
+    document.addEventListener("visibilitychange", function () { if (document.hidden) pauseMock(); });
+    window.addEventListener("pagehide", pauseMock);
     $$("[data-goto]").forEach(function (b) {
       b.addEventListener("click", function () { showView(b.dataset.goto); });
     });
@@ -1469,7 +1529,7 @@
     document.addEventListener("keydown", function (e) {
       if (!$("#view-mock").classList.contains("active") || $("#mock-run").classList.contains("hidden")) return;
       var cur = mockState().cur;
-      if (!cur || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (!cur || !cur.runSince || e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.target && e.target.closest && e.target.closest("input, textarea, select")) return;
       if (e.key === "ArrowRight") { goMock(cur.q + 1); e.preventDefault(); }
       else if (e.key === "ArrowLeft") { goMock(cur.q - 1); e.preventDefault(); }

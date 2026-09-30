@@ -629,3 +629,15 @@ main:has(#view-mock.active #mock-run:not(.hidden)){max-width:1360px}
   .mock-era-num{grid-column:2;grid-row:1}
   .mock-score-num{font-size:38px}
 }
+
+/* 실전 기출: 시작 전·일시정지 가림막 */
+.mock-gate{position:absolute;inset:0;z-index:5;background:var(--card);display:flex;align-items:flex-start;justify-content:center;
+  padding:70px 16px 20px;border-radius:0 0 var(--radius) var(--radius);min-height:320px}
+.gate-box{text-align:center;max-width:360px}
+.gate-box b{display:block;font-size:19px;margin-bottom:8px;color:var(--ink)}
+.gate-box p{color:var(--ink-soft);font-size:14px;line-height:1.7;margin:0 0 18px}
+.gate-box .primary{padding:12px 34px;font-size:16px}
+.paper-body{min-height:320px}
+#mock-run.paused .omr-b{opacity:.35;pointer-events:none}
+.mock-clock.paused{color:var(--ink-soft)}
+.mock-going{color:var(--accent);font-weight:600}
