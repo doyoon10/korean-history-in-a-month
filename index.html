@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>한달 한국사 · Korean History in a Month</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
@@ -13,60 +13,72 @@
 </head>
 <body>
 
-<header class="topbar">
-  <div class="topbar-inner">
-    <div class="brand">
-      <span class="brand-mark" role="img" aria-label="한달 한국사 로고">
-        <svg viewBox="0 0 64 64" aria-hidden="true">
-          <rect width="64" height="64" rx="14" class="logo-bg"/>
-          <circle cx="32" cy="32" r="18" class="logo-gold"/>
-          <path d="M 14,32 A 9,9 0 0 1 32,32 A 9,9 0 0 0 50,32 A 18,18 0 0 0 14,32 Z" class="logo-cream"/>
-        </svg>
-      </span>
-      <div>
-        <div class="brand-title">한달 한국사</div>
-        <div class="brand-sub">Korean History in a Month · 심화 대비 31일 플랜</div>
+<div class="shell">
+<aside class="side">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <span class="brand-mark" role="img" aria-label="한달 한국사 로고">
+          <svg viewBox="0 0 64 64" aria-hidden="true">
+            <rect width="64" height="64" rx="14" class="logo-bg"/>
+            <circle cx="32" cy="32" r="18" class="logo-gold"/>
+            <path d="M 14,32 A 9,9 0 0 1 32,32 A 9,9 0 0 0 50,32 A 18,18 0 0 0 14,32 Z" class="logo-cream"/>
+          </svg>
+        </span>
+        <div class="brand-text">
+          <div class="brand-title">한달 한국사</div>
+          <div class="brand-sub">심화 대비 31일 플랜</div>
+        </div>
       </div>
-    </div>
-    <div class="topbar-right">
       <button class="theme-toggle" id="theme-toggle" type="button" aria-label="다크 모드 전환"></button>
       <div class="dday" id="dday">
         <div class="dday-num">D-</div>
         <div class="dday-label">2026.10.17 시험</div>
       </div>
     </div>
-  </div>
+  </header>
   <nav class="tabs" id="tabs">
-    <button class="tab active" data-view="dash">대시보드</button>
-    <button class="tab" data-view="plan">학습 플랜</button>
-    <button class="tab" data-view="concept">개념 정리</button>
-    <button class="tab" data-view="quiz">연습 문제</button>
-    <button class="tab" data-view="mock">실전 기출</button>
-    <button class="tab" data-view="wrong">오답 노트</button>
-    <button class="tab" data-view="timeline">연표·암기</button>
+    <button class="tab active" data-view="dash" title="대시보드"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h5v-6h4v6h5V9.5"/></svg><span class="tab-name">대시보드</span><span class="tab-short">홈</span></button>
+    <button class="tab" data-view="plan" title="학습 플랜"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg><span class="tab-name">학습 플랜</span><span class="tab-short">플랜</span></button>
+    <button class="tab" data-view="concept" title="개념 정리"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6.5C10.2 5 7.6 4.5 4 4.5v14c3.6 0 6.2.5 8 2 1.8-1.5 4.4-2 8-2v-14c-3.6 0-6.2.5-8 2z"/><path d="M12 6.5v14"/></svg><span class="tab-name">개념 정리</span><span class="tab-short">개념</span></button>
+    <button class="tab" data-view="quiz" title="연습 문제"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg><span class="tab-name">연습 문제</span><span class="tab-short">문제</span></button>
+    <button class="tab" data-view="mock" title="실전 기출"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13.5" r="7"/><path d="M12 10v3.5l2.5 2M9.5 3h5M12 3v3.5"/></svg><span class="tab-name">실전 기출</span><span class="tab-short">기출</span></button>
+    <button class="tab" data-view="wrong" title="오답 노트"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h12v17l-6-4-6 4z"/><path d="M10 8.5l4 4M14 8.5l-4 4"/></svg><span class="tab-name">오답 노트</span><span class="tab-short">오답</span></button>
+    <button class="tab" data-view="timeline" title="연표·암기"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h18M7 7v2.5M12 14.5V17M17 7v2.5"/><circle cx="7" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="17" cy="12" r="1.8" fill="currentColor"/></svg><span class="tab-name">연표·암기</span><span class="tab-short">연표</span></button>
   </nav>
-</header>
+  <div class="side-foot">학습 기록은 이 브라우저에만 저장됩니다.<br>문의: 26_07@bssm.hs.kr</div>
+</aside>
 
+<div class="page">
 <main id="app">
 
   <!-- 대시보드 -->
   <section class="view active" id="view-dash">
-    <div class="hero">
-      <h1>1달 안에 심화 <b>1급</b>까지 갑니다</h1>
-      <p class="hero-sub">심화 1급은 80점, 2급 70점, 3급 60점입니다. 총 50문항, 80분, 문항당 2점.
-      근현대(개항기~현대)가 <b>전체의 약 40%</b>라 여기서 점수가 갈립니다.</p>
-      <div class="hero-stat">
-        <div class="stat"><span id="stat-days">-</span><small>남은 일수</small></div>
+    <div class="view-head">
+      <h1>1달 안에 심화 <b>1급</b>까지</h1>
+      <p>심화 1급 80점 · 2급 70점 · 3급 60점. 50문항 80분, 문항당 2점. 근현대(개항기~현대)가 <b>전체의 약 40%</b>라 여기서 점수가 갈립니다.</p>
+    </div>
+
+    <div class="dash-top">
+      <div class="card today-card">
+        <h2>오늘의 학습</h2>
+        <div id="today-box"></div>
+      </div>
+      <div class="stat-grid">
+        <div class="stat accent"><span id="stat-days">-</span><small>시험까지 남은 날</small></div>
+        <div class="stat"><span id="stat-solved">-</span><small>푼 문항</small></div>
         <div class="stat"><span id="stat-topics">-</span><small>개념 주제</small></div>
         <div class="stat"><span id="stat-quiz">-</span><small>연습 문항</small></div>
-        <div class="stat"><span id="stat-solved">-</span><small>푼 문항</small></div>
       </div>
     </div>
 
-    <div class="grid2">
+    <div class="dash-mid">
       <div class="card">
-        <h2>오늘의 학습</h2>
-        <div id="today-box"></div>
+        <div class="card-head">
+          <h2>시대별 정답률</h2>
+          <button class="mini danger" id="acc-reset-all">전체 기록 초기화</button>
+        </div>
+        <div id="accuracy-box" class="accuracy-list"></div>
       </div>
       <div class="card">
         <h2>진도율</h2>
@@ -74,16 +86,8 @@
       </div>
     </div>
 
-    <div class="card">
-      <h2>시대별 정답률</h2>
-      <div id="accuracy-box" class="accuracy-list"></div>
-      <div class="btn-group" style="margin-top:14px">
-        <button class="mini danger" id="acc-reset-all">전체 학습 기록 초기화</button>
-      </div>
-    </div>
-
-    <div class="card strategy">
-      <h2>합격 전략 요약</h2>
+    <details class="card strategy" open>
+      <summary><h2>합격 전략 요약</h2></summary>
       <ol>
         <li><b>순서대로 하지 말고 비중대로.</b> 근현대(개항기·일제·현대)가 20문항 안팎입니다. 1주차에 전근대를 빠르게 훑고 2주차부터 근현대에 시간을 몰아주세요.</li>
         <li><b>왕·사건 매칭이 전부입니다.</b> 심화 문제의 70%는 "이 자료가 누구/언제냐"를 묻습니다. 개념 페이지의 <span class="chip">핵심 키워드</span>만 봐도 답이 떠오르면 그 주제는 끝난 겁니다.</li>
@@ -91,7 +95,7 @@
         <li><b>1급이 목표면 하루 2시간, 3급이 목표면 하루 1시간.</b> 3급만 필요하면 플랜에서 ★ 표시된 날만 해도 60점은 나옵니다.</li>
         <li><b>마지막 5일은 새 개념 금지.</b> 오답 노트와 모의고사만 도세요.</li>
       </ol>
-    </div>
+    </details>
   </section>
 
   <!-- 학습 플랜 -->
@@ -111,14 +115,25 @@
   <section class="view" id="view-concept">
     <div class="view-head">
       <h1>개념 정리</h1>
-      <p>시대를 고르고 주제를 펼쳐 보세요. <b>빨간 글씨</b>가 시험에 그대로 나오는 핵심어입니다. 밑줄 단어나 <span class="note-blue">파란 ㄴ→ 단어</span>에 마우스를 올리면(휴대폰은 탭) 풀이가 뜹니다. 첫 줄의 <span class="note-blue">파란 괄호</span>는 필기에 그대로 옮겨 적으면 됩니다. "풀이 펼치기"를 누르면 괄호가 본문 제자리에 들어가 필기하는 모양 그대로 보입니다.</p>
+      <p>목차에서 주제를 고르면 한 주제씩 크게 보입니다. 아래 이전·다음 버튼이나 키보드 ← → 로 넘기세요. <b>빨간 글씨</b>가 시험에 그대로 나오는 핵심어입니다. 밑줄 단어나 <span class="note-blue">파란 ㄴ→ 단어</span>에 마우스를 올리면(휴대폰은 탭) 풀이가 뜹니다. 첫 줄의 <span class="note-blue">파란 괄호</span>는 필기에 그대로 옮겨 적으면 됩니다. "풀이 펼치기"를 누르면 괄호가 본문 제자리에 들어가 필기하는 모양 그대로 보입니다.</p>
     </div>
-    <div class="era-filter" id="concept-eras"></div>
-    <div class="search-row">
-      <input type="search" id="concept-search" placeholder="키워드 검색 (예: 신문왕, 대동법, 신간회)">
-      <button class="mini" id="note-toggle" type="button" aria-pressed="false">풀이 펼치기</button>
+    <div class="reader">
+      <aside class="toc">
+        <button class="toc-toggle" id="toc-toggle" type="button" aria-expanded="false"><span>목차</span><b id="toc-current"></b><i>▾</i></button>
+        <div class="toc-top">
+          <input type="search" id="concept-search" placeholder="키워드 검색 (예: 대동법, 신간회)">
+        </div>
+        <div class="toc-list" id="concept-toc"></div>
+      </aside>
+      <article class="reader-main">
+        <div class="reader-tools">
+          <span class="topic-crumb" id="concept-crumb"></span>
+          <button class="mini" id="note-toggle" type="button" aria-pressed="false">풀이 펼치기</button>
+        </div>
+        <div id="concept-list"></div>
+        <div class="concept-nav" id="concept-nav"></div>
+      </article>
     </div>
-    <div id="concept-list"></div>
   </section>
 
   <!-- 기출 문제 -->
@@ -206,6 +221,8 @@
     문의: 26_07@bssm.hs.kr <br>
   </p>
 </footer>
+</div>
+</div>
 
 <script src="js/data/concepts_1.js"></script>
 <script src="js/data/concepts_2.js"></script>

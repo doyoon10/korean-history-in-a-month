@@ -221,7 +221,18 @@
   }
 
   // ---------- 탭 ----------
+  // 휴대폰에서는 머리줄이 화면 위에 붙어 있어 그만큼 비켜 둔다. 넓은 화면은 메뉴가 왼쪽이라 0
+  function topbarH() {
+    var side = $(".side");
+    return side && getComputedStyle(side).display === "contents" ? $(".topbar").offsetHeight : 0;
+  }
+  function setTopbarH() {
+    document.documentElement.style.setProperty("--topbar-h", topbarH() + "px");
+  }
   function initTabs() {
+    setTopbarH();
+    var rt = null;
+    window.addEventListener("resize", function () { clearTimeout(rt); rt = setTimeout(setTopbarH, 100); });
     $$("#tabs .tab").forEach(function (btn) {
       btn.addEventListener("click", function () {
         showView(btn.dataset.view);
@@ -350,11 +361,11 @@
       var st = S.stats[e.id] || { ok: 0, n: 0 };
       var pct = st.n ? Math.round(st.ok / st.n * 100) : 0;
       var color = st.n === 0 ? "var(--ink-soft)" : pct >= 80 ? "var(--green)" : pct >= 60 ? "var(--orange)" : "var(--bad)";
-      return '<div class="acc-item"><div class="acc-name">' + esc(e.short) + "</div>" +
-        '<div class="acc-num" style="color:' + color + '">' + (st.n ? pct + "%" : "-") +
-        " <small>" + st.ok + "/" + st.n + "</small></div>" +
-        '<div class="bar" style="margin-top:8px"><i style="width:' + pct + "%;background:" + color + '"></i></div>' +
-        (st.n ? '<button class="mini acc-reset" data-reset="' + e.id + '">기록 지우기</button>' : "") +
+      return '<div class="acc-item"><span class="acc-name">' + esc(e.short) + "</span>" +
+        '<div class="bar"><i style="width:' + pct + "%;background:" + color + '"></i></div>' +
+        '<span class="acc-num" style="color:' + color + '">' + (st.n ? pct + "%" : "-") +
+        " <small>" + st.ok + "/" + st.n + "</small></span>" +
+        (st.n ? '<button class="acc-reset" data-reset="' + e.id + '" title="' + esc(e.short) + ' 기록 지우기" aria-label="' + esc(e.short) + ' 기록 지우기">×</button>' : "<span></span>") +
         "</div>";
     }).join("");
     box.innerHTML = html;
@@ -468,65 +479,111 @@
   }
 
   // ---------- 개념 ----------
-  var conceptEra = "all";
+  // 왼쪽 목차에서 고른 한 주제만 오른쪽에 크게 보여 준다. 마지막으로 본 주제를 기억한다
+  var CONCEPT_KEY = "hanneung_concept_cur";
+  var TOPICS = [];
+  (window.CONCEPTS || []).forEach(function (era) {
+    era.topics.forEach(function (t) { TOPICS.push({ t: t, era: era }); });
+  });
+  var conceptCur = null, conceptFocus = [];
+
+  function topicIndex(id) {
+    for (var i = 0; i < TOPICS.length; i++) if (TOPICS[i].t.id === id) return i;
+    return -1;
+  }
 
   function initConcept() {
-    var host = $("#concept-eras");
-    var html = '<button class="mini active" data-era="all">전체</button>';
-    (window.CONCEPTS || []).forEach(function (e) {
-      html += '<button class="mini" data-era="' + e.id + '">' + esc(e.short) + "</button>";
+    try { conceptCur = localStorage.getItem(CONCEPT_KEY); } catch (e) {}
+    if (topicIndex(conceptCur) < 0) conceptCur = TOPICS.length ? TOPICS[0].t.id : null;
+    $("#concept-search").addEventListener("input", renderToc);
+    $("#concept-toc").addEventListener("click", function (e) {
+      var b = e.target.closest("[data-topic-id]");
+      if (b) pickTopic(b.dataset.topicId);
     });
-    host.innerHTML = html;
-    $$("button", host).forEach(function (b) {
-      b.addEventListener("click", function () {
-        $$("button", host).forEach(function (x) { x.classList.remove("active"); });
-        b.classList.add("active");
-        conceptEra = b.dataset.era;
-        renderConcept();
-      });
+    $("#concept-nav").addEventListener("click", function (e) {
+      var b = e.target.closest("[data-go]");
+      if (b) pickTopic(b.dataset.go);
     });
-    $("#concept-search").addEventListener("input", renderConcept);
+    $("#toc-toggle").addEventListener("click", function () { setTocOpen(!$(".reader").classList.contains("toc-open")); });
+    // 키보드 ← → 로 이전·다음 주제
+    document.addEventListener("keydown", function (e) {
+      if (!$("#view-concept").classList.contains("active") || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.target && e.target.closest && e.target.closest("input, textarea, select")) return;
+      var i = topicIndex(conceptCur);
+      if (e.key === "ArrowRight" && TOPICS[i + 1]) { pickTopic(TOPICS[i + 1].t.id); e.preventDefault(); }
+      else if (e.key === "ArrowLeft" && TOPICS[i - 1]) { pickTopic(TOPICS[i - 1].t.id); e.preventDefault(); }
+    });
     renderConcept();
   }
 
-  function renderConcept(openIds) {
+  function setTocOpen(on) {
+    $(".reader").classList.toggle("toc-open", on);
+    $("#toc-toggle").setAttribute("aria-expanded", on ? "true" : "false");
+  }
+
+  function renderToc() {
     var q = $("#concept-search").value.trim().toLowerCase();
-    var host = $("#concept-list");
-    var html = "";
-    var hit = 0;
-
-    (window.CONCEPTS || []).forEach(function (era) {
-      if (conceptEra !== "all" && conceptEra !== era.id) return;
-      var topics = era.topics.filter(function (t) {
-        if (!q) return true;
-        var hay = (t.title + " " + t.points.join(" ") + " " + t.keywords.join(" ") + " " + t.tip).toLowerCase();
-        return hay.indexOf(q) !== -1;
-      });
-      if (!topics.length) return;
-      hit += topics.length;
-      html += '<div class="era-block"><h3 class="era-title">' + esc(era.name) +
-        '<span class="era-ratio">약 ' + era.ratio + "문항</span></h3>";
-      topics.forEach(function (t) {
-        var open = q || (openIds && openIds.indexOf(t.id) !== -1);
-        var seen = {};
-        html +=
-          '<div class="topic' + (open ? " open" : "") + '" id="topic-' + t.id + '">' +
-          '<div class="topic-head"><span class="topic-arrow">▶</span><h3>' + esc(t.title) + "</h3></div>" +
-          '<div class="topic-body"><ul class="points">' +
-          t.points.map(function (p) { return noteBulletsHtml(p, era.id, seen, t.id); }).join("") + "</ul>" +
-          (IMAGES_BY_TOPIC[t.id] ? '<div class="photo-row">' +
-            IMAGES_BY_TOPIC[t.id].map(function (id) { return figureHtml(id, true); }).join("") + "</div>" : "") +
-          '<div class="kw-row">' +
-          t.keywords.map(function (k) { return '<span class="kw">' + linkTerms(esc(k), era.id, {}) + "</span>"; }).join("") +
-          '</div><div class="tip">' + linkTerms(fmt(t.tip), era.id, seen) + "</div></div></div>";
-      });
-      html += "</div>";
+    var host = $("#concept-toc");
+    var list = TOPICS.filter(function (x) {
+      if (!q) return true;
+      var t = x.t;
+      var hay = (t.title + " " + t.points.join(" ") + " " + t.keywords.join(" ") + " " + t.tip).toLowerCase();
+      return hay.indexOf(q) !== -1;
     });
-
-    host.innerHTML = hit ? html : '<p class="empty">검색 결과가 없습니다.</p>';
-    $$(".topic-head", host).forEach(function (h) {
-      h.addEventListener("click", function () { h.parentNode.classList.toggle("open"); });
+    var html = q ? '<p class="toc-count">' + list.length + "개 주제에 있습니다</p>" : "";
+    var lastEra = null;
+    list.forEach(function (x) {
+      if (x.era !== lastEra) {
+        if (lastEra) html += "</div>";
+        lastEra = x.era;
+        html += '<div class="toc-era"><div class="toc-era-name">' + esc(x.era.name) + "<small>약 " + x.era.ratio + "문항</small></div>";
+      }
+      var id = x.t.id;
+      html += '<button type="button" class="toc-item' + (id === conceptCur ? " on" : "") +
+        (conceptFocus.indexOf(id) !== -1 ? " focus" : "") + '" data-topic-id="' + id + '">' + esc(x.t.title) + "</button>";
     });
+    if (lastEra) html += "</div>";
+    host.innerHTML = list.length ? html : '<p class="empty">검색 결과가 없습니다.</p>';
+    // 지금 주제가 목차 밖에 있으면 보이는 곳으로
+    var on = $(".toc-item.on", host);
+    if (on && host.scrollHeight > host.clientHeight) {
+      var top = on.offsetTop - host.offsetTop;
+      if (top < host.scrollTop || top + on.offsetHeight > host.scrollTop + host.clientHeight) host.scrollTop = top - host.clientHeight / 3;
+    }
+  }
+
+  function renderConcept() {
+    var i = topicIndex(conceptCur);
+    if (i < 0) return;
+    var x = TOPICS[i], t = x.t, era = x.era, seen = {};
+    var prev = TOPICS[i - 1], next = TOPICS[i + 1];
+    $("#concept-crumb").innerHTML = esc(era.name) + " <span>" + (i + 1) + " / " + TOPICS.length + "</span>";
+    $("#toc-current").textContent = t.title;
+    $("#concept-list").innerHTML =
+      '<div class="topic-page" id="topic-' + t.id + '">' +
+      '<h2 class="topic-title">' + esc(t.title) + "</h2>" +
+      '<div class="topic-body"><ul class="points">' +
+      t.points.map(function (p) { return noteBulletsHtml(p, era.id, seen, t.id); }).join("") + "</ul>" +
+      (IMAGES_BY_TOPIC[t.id] ? '<div class="photo-row">' +
+        IMAGES_BY_TOPIC[t.id].map(function (id) { return figureHtml(id, true); }).join("") + "</div>" : "") +
+      '<div class="kw-row">' +
+      t.keywords.map(function (k) { return '<span class="kw">' + linkTerms(esc(k), era.id, {}) + "</span>"; }).join("") +
+      '</div><div class="tip">' + linkTerms(fmt(t.tip), era.id, seen) + "</div></div></div>";
+    $("#concept-nav").innerHTML =
+      (prev ? '<button type="button" class="nav-prev" data-go="' + prev.t.id + '"><small>← 이전</small>' + esc(prev.t.title) + "</button>" : "<span></span>") +
+      (next ? '<button type="button" class="nav-next" data-go="' + next.t.id + '"><small>다음 →</small>' + esc(next.t.title) + "</button>" : "<span></span>");
+    renderToc();
+  }
+
+  function pickTopic(id) {
+    if (topicIndex(id) < 0) return;
+    conceptCur = id;
+    try { localStorage.setItem(CONCEPT_KEY, id); } catch (e) {}
+    setTocOpen(false);
+    renderConcept();
+    // 본문 머리가 화면 위로 지나가 있으면 거기로 올린다
+    var r = $(".reader-main").getBoundingClientRect(), th = topbarH();
+    if (r.top < th) window.scrollBy({ top: r.top - th - 12, behavior: "smooth" });
   }
 
   // 손필기 모양: "주체 : 핵심어들" 한 줄 + 아래에 'ㄴ→ 단어' (호버하면 종류·쉬운 뜻·괄호 속 참고)
@@ -694,15 +751,13 @@
     paint();
   }
 
+  // 플랜·결과에서 "개념 보기": 그 범위 첫 주제를 열고, 목차에 범위를 점으로 표시한다
   function openConceptFor(p) {
     if (!p || !p.concepts.length) return;
-    conceptEra = "all";
-    $$("#concept-eras button").forEach(function (x) { x.classList.toggle("active", x.dataset.era === "all"); });
+    conceptFocus = p.concepts.slice();
     $("#concept-search").value = "";
     showView("concept");
-    renderConcept(p.concepts);
-    var first = document.getElementById("topic-" + p.concepts[0]);
-    if (first) setTimeout(function () { first.scrollIntoView({ behavior: "smooth", block: "start" }); }, 60);
+    pickTopic(p.concepts[0]);
   }
 
   // ---------- 문제 ----------
@@ -1142,7 +1197,7 @@
     var M = mockState(), cur = M.cur, ex = examByRound(cur.round);
     if (cur.q == null) cur.q = 0;
     showMockPart("run");
-    document.documentElement.style.setProperty("--topbar-h", ($(".topbar") || { offsetHeight: 0 }).offsetHeight + "px");
+    setTopbarH();
     var host = $("#mock-run");
     var omr = "";
     for (var i = 0; i < 50; i++) {
