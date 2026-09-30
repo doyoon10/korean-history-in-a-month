@@ -542,7 +542,8 @@ html.theme-vt::view-transition-new(root){animation-name:theme-fade-in}
 .toc-item{display:block;width:100%;text-align:left;border:0;background:none;padding:7px 10px;border-radius:8px;font-size:13.5px;line-height:1.4;color:var(--ink)}
 .toc-item:hover{background:var(--surface-2)}
 .toc-item.on{background:var(--accent-fill);color:#fff;font-weight:600}
-.toc-item.focus:not(.on)::after{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--orange);margin-left:7px;vertical-align:2px}
+.toc-item.in{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.toc-item.focus:not(.on):not(.in)::after{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--orange);margin-left:7px;vertical-align:2px}
 .reader-main{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:22px 28px 22px;min-width:0}
 .reader-tools{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px}
 .topic-crumb{font-size:12.5px;font-weight:700;color:var(--accent)}
@@ -551,6 +552,20 @@ html.theme-vt::view-transition-new(root){animation-name:theme-fade-in}
 .topic-title{font-size:23px;margin:0 0 4px;letter-spacing:-.6px;line-height:1.35}
 .topic-page .topic-body{display:block;padding:0;border:0}
 .topic-page .topic-body ul{font-size:15px}
+.concept-modes{display:flex;gap:6px;margin-bottom:14px}
+.concept-modes .mini{padding:8px 16px;font-size:13.5px}
+.range-title{margin-bottom:12px}
+.range-jump{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px}
+.range-jump .mini{padding:5px 12px;font-size:12.5px;color:var(--ink)}
+.range-jump .mini b{color:var(--accent);margin-right:2px}
+.range-empty{margin:4px 0 0;font-size:14px;color:var(--ink-soft);line-height:1.7}
+.topic-page+.topic-page{margin-top:26px;padding-top:22px;border-top:2px dashed var(--line)}
+.range-head{display:flex;align-items:flex-start;gap:10px;margin-top:22px}
+.range-num{flex:none;width:26px;height:26px;border-radius:50%;background:var(--accent-fill);color:#fff;font-size:13px;font-weight:800;display:grid;place-items:center;margin-top:3px}
+.range-era{font-size:12px;font-weight:600;color:var(--ink-soft);line-height:1.3}
+.range-topic{margin:0;font-size:18.5px;letter-spacing:-.4px;line-height:1.4}
+.topic-page .range-head+.topic-body ul{margin-top:12px}
+.topic-page+.topic-page .range-head{margin-top:0}
 .concept-nav{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:24px;padding-top:18px;border-top:1px solid var(--line)}
 .concept-nav button{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:10px 14px;text-align:left;font-size:14px;font-weight:600;color:var(--ink);line-height:1.4}
 .concept-nav button:hover{border-color:var(--accent)}

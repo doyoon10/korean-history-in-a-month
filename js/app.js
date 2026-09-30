@@ -479,30 +479,62 @@
   }
 
   // ---------- 개념 ----------
-  // 왼쪽 목차에서 고른 한 주제만 오른쪽에 크게 보여 준다. 마지막으로 본 주제를 기억한다
-  var CONCEPT_KEY = "hanneung_concept_cur", TOC_KEY = "hanneung_toc_hidden";
+  // 두 가지로 본다. "오늘 범위"는 플랜 하루치 주제를 한 화면에 이어서, "전체 주제"는 목차에서 고른 한 주제씩.
+  // 고른 방식과 마지막으로 본 주제를 기억한다. 오늘 범위는 들어올 때마다 대시보드의 오늘 학습 날로 맞춘다
+  var CONCEPT_KEY = "hanneung_concept_cur", TOC_KEY = "hanneung_toc_hidden", MODE_KEY = "hanneung_concept_mode";
   var TOPICS = [];
   (window.CONCEPTS || []).forEach(function (era) {
     era.topics.forEach(function (t) { TOPICS.push({ t: t, era: era }); });
   });
-  var conceptCur = null, conceptFocus = [];
+  var conceptCur = null, rangeDay = null;
 
   function topicIndex(id) {
     for (var i = 0; i < TOPICS.length; i++) if (TOPICS[i].t.id === id) return i;
     return -1;
   }
+  // 새 개념이 있는 날만 (복습일 빼고)
+  function studyDays() { return window.PLAN.filter(function (p) { return p.concepts.length; }); }
+  function nearDay(day, dir) {
+    var days = studyDays();
+    if (dir < 0) { for (var i = days.length - 1; i >= 0; i--) if (days[i].day < day) return days[i]; }
+    else { for (var j = 0; j < days.length; j++) if (days[j].day > day) return days[j]; }
+    return null;
+  }
+  function rangeIds() {
+    var p = rangeDay != null && planByDay(rangeDay);
+    return p ? p.concepts.filter(function (id) { return topicIndex(id) >= 0; }) : [];
+  }
 
   function initConcept() {
     try { conceptCur = localStorage.getItem(CONCEPT_KEY); } catch (e) {}
     if (topicIndex(conceptCur) < 0) conceptCur = TOPICS.length ? TOPICS[0].t.id : null;
+    var mode = "range";
+    try { mode = localStorage.getItem(MODE_KEY) || "range"; } catch (e) {}
+    rangeDay = mode === "range" ? currentPlan().day : null;
+
+    $("#concept-modes").addEventListener("click", function (e) {
+      var b = e.target.closest("[data-mode]");
+      if (!b) return;
+      if (b.dataset.mode === "range") showRange(currentPlan().day);
+      else pickTopic(conceptCur);
+    });
     $("#concept-search").addEventListener("input", renderToc);
     $("#concept-toc").addEventListener("click", function (e) {
       var b = e.target.closest("[data-topic-id]");
-      if (b) pickTopic(b.dataset.topicId);
+      if (!b) return;
+      // 오늘 범위를 보는 중에 범위 안 주제를 누르면 그 자리로 내려가고, 범위 밖이면 그 주제 하나를 연다
+      if (rangeDay != null && rangeIds().indexOf(b.dataset.topicId) !== -1) jumpTo(b.dataset.topicId);
+      else pickTopic(b.dataset.topicId);
+    });
+    $("#concept-list").addEventListener("click", function (e) {
+      var b = e.target.closest("[data-jump-topic]");
+      if (b) jumpTo(b.dataset.jumpTopic);
     });
     $("#concept-nav").addEventListener("click", function (e) {
-      var b = e.target.closest("[data-go]");
-      if (b) pickTopic(b.dataset.go);
+      var b = e.target.closest("[data-go], [data-go-day]");
+      if (!b) return;
+      if (b.dataset.goDay) showRange(+b.dataset.goDay);
+      else pickTopic(b.dataset.go);
     });
     $("#toc-toggle").addEventListener("click", function () { setTocOpen(!$(".reader").classList.contains("toc-open")); });
     // 넓은 화면: 목차를 접으면 본문이 넓어진다. 접은 상태를 기억한다
@@ -511,13 +543,20 @@
     $(".reader").classList.toggle("toc-hidden", hidden);
     $("#toc-hide").addEventListener("click", function () { setTocHidden(true); });
     $("#toc-show").addEventListener("click", function () { setTocHidden(false); renderToc(); });
-    // 키보드 ← → 로 이전·다음 주제
+    // 키보드 ← → : 오늘 범위에서는 앞뒤 날, 전체 주제에서는 앞뒤 주제
     document.addEventListener("keydown", function (e) {
       if (!$("#view-concept").classList.contains("active") || e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.target && e.target.closest && e.target.closest("input, textarea, select")) return;
-      var i = topicIndex(conceptCur);
-      if (e.key === "ArrowRight" && TOPICS[i + 1]) { pickTopic(TOPICS[i + 1].t.id); e.preventDefault(); }
-      else if (e.key === "ArrowLeft" && TOPICS[i - 1]) { pickTopic(TOPICS[i - 1].t.id); e.preventDefault(); }
+      if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+      var dir = e.key === "ArrowRight" ? 1 : -1;
+      if (rangeDay != null) {
+        var d = nearDay(rangeDay, dir);
+        if (d) showRange(d.day);
+      } else {
+        var x = TOPICS[topicIndex(conceptCur) + dir];
+        if (x) pickTopic(x.t.id);
+      }
+      e.preventDefault();
     });
     renderConcept();
   }
@@ -530,10 +569,14 @@
     $(".reader").classList.toggle("toc-open", on);
     $("#toc-toggle").setAttribute("aria-expanded", on ? "true" : "false");
   }
+  function setMode(mode) {
+    try { localStorage.setItem(MODE_KEY, mode); } catch (e) {}
+  }
 
   function renderToc() {
     var q = $("#concept-search").value.trim().toLowerCase();
     var host = $("#concept-toc");
+    var inRange = rangeIds(), today = currentPlan().concepts;
     var list = TOPICS.filter(function (x) {
       if (!q) return true;
       var t = x.t;
@@ -549,51 +592,111 @@
         html += '<div class="toc-era"><div class="toc-era-name">' + esc(x.era.name) + "<small>약 " + x.era.ratio + "문항</small></div>";
       }
       var id = x.t.id;
-      html += '<button type="button" class="toc-item' + (id === conceptCur ? " on" : "") +
-        (conceptFocus.indexOf(id) !== -1 ? " focus" : "") + '" data-topic-id="' + id + '">' + esc(x.t.title) + "</button>";
+      var cls = rangeDay != null ? (inRange.indexOf(id) !== -1 ? " in" : "") : (id === conceptCur ? " on" : "");
+      html += '<button type="button" class="toc-item' + cls +
+        (today.indexOf(id) !== -1 ? " focus" : "") + '" data-topic-id="' + id + '">' + esc(x.t.title) + "</button>";
     });
     if (lastEra) html += "</div>";
     host.innerHTML = list.length ? html : '<p class="empty">검색 결과가 없습니다.</p>';
     // 지금 주제가 목차 밖에 있으면 보이는 곳으로
-    var on = $(".toc-item.on", host);
+    var on = $(".toc-item.on, .toc-item.in", host);
     if (on && host.scrollHeight > host.clientHeight) {
       var top = on.offsetTop - host.offsetTop;
       if (top < host.scrollTop || top + on.offsetHeight > host.scrollTop + host.clientHeight) host.scrollTop = top - host.clientHeight / 3;
     }
   }
 
-  function renderConcept() {
-    var i = topicIndex(conceptCur);
-    if (i < 0) return;
-    var x = TOPICS[i], t = x.t, era = x.era, seen = {};
-    var prev = TOPICS[i - 1], next = TOPICS[i + 1];
-    $("#concept-crumb").innerHTML = esc(era.name) + " <span>" + (i + 1) + " / " + TOPICS.length + "</span>";
-    $("#toc-current").textContent = t.title;
-    $("#concept-list").innerHTML =
-      '<div class="topic-page" id="topic-' + t.id + '">' +
-      '<h2 class="topic-title">' + esc(t.title) + "</h2>" +
+  function topicHtml(x, heading) {
+    var t = x.t, era = x.era, seen = {};
+    return '<section class="topic-page" id="topic-' + t.id + '">' + heading +
       '<div class="topic-body"><ul class="points">' +
       t.points.map(function (p) { return noteBulletsHtml(p, era.id, seen, t.id); }).join("") + "</ul>" +
       (IMAGES_BY_TOPIC[t.id] ? '<div class="photo-row">' +
         IMAGES_BY_TOPIC[t.id].map(function (id) { return figureHtml(id, true); }).join("") + "</div>" : "") +
       '<div class="kw-row">' +
       t.keywords.map(function (k) { return '<span class="kw">' + linkTerms(esc(k), era.id, {}) + "</span>"; }).join("") +
-      '</div><div class="tip">' + linkTerms(fmt(t.tip), era.id, seen) + "</div></div></div>";
+      '</div><div class="tip">' + linkTerms(fmt(t.tip), era.id, seen) + "</div></div></section>";
+  }
+
+  function paintModes() {
+    var today = currentPlan();
+    $("#mode-range-day").textContent = "DAY " + today.day;
+    $$("#concept-modes [data-mode]").forEach(function (b) {
+      b.classList.toggle("active", (b.dataset.mode === "range") === (rangeDay != null));
+    });
+  }
+
+  function renderConcept() {
+    paintModes();
+    if (rangeDay != null) return renderRange();
+    var i = topicIndex(conceptCur);
+    if (i < 0) return;
+    var x = TOPICS[i], t = x.t;
+    var prev = TOPICS[i - 1], next = TOPICS[i + 1];
+    $("#concept-crumb").innerHTML = esc(x.era.name) + " <span>" + (i + 1) + " / " + TOPICS.length + "</span>";
+    $("#toc-current").textContent = t.title;
+    $("#concept-list").innerHTML = topicHtml(x, '<h2 class="topic-title">' + esc(t.title) + "</h2>");
     $("#concept-nav").innerHTML =
       (prev ? '<button type="button" class="nav-prev" data-go="' + prev.t.id + '"><small>← 이전</small>' + esc(prev.t.title) + "</button>" : "<span></span>") +
       (next ? '<button type="button" class="nav-next" data-go="' + next.t.id + '"><small>다음 →</small>' + esc(next.t.title) + "</button>" : "<span></span>");
     renderToc();
   }
 
+  // 오늘 범위: 그날 주제를 순서대로 이어 붙이고, 맨 위에 바로가기, 맨 아래에 앞뒤 날
+  function renderRange() {
+    var p = planByDay(rangeDay), ids = rangeIds();
+    var isToday = p.day === currentPlan().day;
+    $("#concept-crumb").innerHTML = (isToday ? "오늘 범위 · " : "") + "DAY " + p.day +
+      " <span>" + p.date + " · " + (ids.length ? ids.length + "개 주제" : "복습일") + "</span>";
+    $("#toc-current").textContent = "DAY " + p.day + " · " + p.title;
+    var html = '<h2 class="topic-title range-title">' + esc(p.title) + "</h2>";
+    if (!ids.length) {
+      html += '<p class="range-empty">이날은 새 개념 없이 복습하는 날입니다. 오답 노트와 연습 문제를 돌리고, 앞 범위는 아래 버튼으로 다시 볼 수 있습니다.</p>';
+    } else {
+      if (ids.length > 1) html += '<div class="range-jump">' + ids.map(function (id, k) {
+        return '<button type="button" class="mini" data-jump-topic="' + id + '"><b>' + (k + 1) + "</b> " + esc(TOPICS[topicIndex(id)].t.title) + "</button>";
+      }).join("") + "</div>";
+      html += ids.map(function (id, k) {
+        var x = TOPICS[topicIndex(id)];
+        return topicHtml(x, '<div class="range-head"><span class="range-num">' + (k + 1) + "</span>" +
+          '<div><div class="range-era">' + esc(x.era.name) + '</div><h3 class="range-topic">' + esc(x.t.title) + "</h3></div></div>");
+      }).join("");
+    }
+    $("#concept-list").innerHTML = html;
+    var prev = nearDay(p.day, -1), next = nearDay(p.day, 1);
+    $("#concept-nav").innerHTML =
+      (prev ? '<button type="button" class="nav-prev" data-go-day="' + prev.day + '"><small>← DAY ' + prev.day + "</small>" + esc(prev.title) + "</button>" : "<span></span>") +
+      (next ? '<button type="button" class="nav-next" data-go-day="' + next.day + '"><small>DAY ' + next.day + " →</small>" + esc(next.title) + "</button>" : "<span></span>");
+    renderToc();
+  }
+
+  function scrollToReader() {
+    var r = $(".reader-main").getBoundingClientRect(), th = topbarH();
+    if (r.top < th) window.scrollBy({ top: r.top - th - 12, behavior: "smooth" });
+  }
+  function showRange(day) {
+    if (!planByDay(day)) return;
+    rangeDay = day;
+    setMode("range");
+    setTocOpen(false);
+    renderConcept();
+    scrollToReader();
+  }
   function pickTopic(id) {
     if (topicIndex(id) < 0) return;
     conceptCur = id;
+    rangeDay = null;
+    setMode("all");
     try { localStorage.setItem(CONCEPT_KEY, id); } catch (e) {}
     setTocOpen(false);
     renderConcept();
-    // 본문 머리가 화면 위로 지나가 있으면 거기로 올린다
-    var r = $(".reader-main").getBoundingClientRect(), th = topbarH();
-    if (r.top < th) window.scrollBy({ top: r.top - th - 12, behavior: "smooth" });
+    scrollToReader();
+  }
+  // 오늘 범위 안에서 그 주제 머리로 내려간다
+  function jumpTo(id) {
+    setTocOpen(false);
+    var el = document.getElementById("topic-" + id);
+    if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.pageYOffset - topbarH() - 14, behavior: "smooth" });
   }
 
   // 손필기 모양: "주체 : 핵심어들" 한 줄 + 아래에 'ㄴ→ 단어' (호버하면 종류·쉬운 뜻·괄호 속 참고)
@@ -761,13 +864,13 @@
     paint();
   }
 
-  // 플랜·결과에서 "개념 보기": 그 범위 첫 주제를 열고, 목차에 범위를 점으로 표시한다
+  // 플랜·대시보드의 "개념 보기"는 그날 범위를 한 화면에, 실전 기출 결과의 "개념 보기"는 그 주제 하나를 연다
   function openConceptFor(p) {
     if (!p || !p.concepts.length) return;
-    conceptFocus = p.concepts.slice();
     $("#concept-search").value = "";
     showView("concept");
-    pickTopic(p.concepts[0]);
+    if (p.day != null) showRange(p.day);
+    else pickTopic(p.concepts[0]);
   }
 
   // ---------- 문제 ----------
