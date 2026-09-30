@@ -541,21 +541,49 @@ main:has(#view-mock.active #mock-run:not(.hidden)){max-width:1360px}
 .mock-bar-btns{margin-left:auto;display:flex;gap:8px;align-items:center}
 .primary.small{padding:8px 14px;font-size:13.5px}
 
-.mock-grid{display:grid;grid-template-columns:minmax(0,1fr) 384px;gap:14px;
-  height:calc(100vh - var(--topbar-h,110px) - 70px);min-height:520px}
-.mock-paper{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;display:flex;flex-direction:column;min-height:0}
-.paper-tools{display:flex;gap:8px;padding:8px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.mock-grid{display:grid;grid-template-columns:minmax(0,1fr) 384px;gap:14px;align-items:start}
+.mock-paper{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);display:flex;flex-direction:column;min-height:0}
+.mock-paper.is-full{height:calc(100vh - var(--topbar-h,110px) - 80px);min-height:480px;overflow:hidden}
+.paper-tools{display:flex;gap:8px;padding:8px;border-bottom:1px solid var(--line);flex-wrap:wrap;align-items:center;justify-content:space-between}
+.seg{display:flex;gap:6px}
+.paper-note{margin:8px 12px 0}
+.paper-body{flex:1;min-height:0;display:flex;flex-direction:column;position:relative}
 .paper-frame{flex:1;width:100%;border:0;min-height:0;background:#fff}
+.paper-open{position:absolute;right:10px;bottom:10px;font-size:12px;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:4px 10px;color:var(--ink-soft)}
+.qv{display:flex;flex-direction:column;align-items:center;padding:14px 12px 0}
+.qv-img{background:#fff;border-radius:6px;box-shadow:0 0 0 1px var(--line);max-width:100%;min-height:240px;min-width:min(100%,320px);display:flex;align-items:flex-start;justify-content:center;position:relative}
+.qv-img.loading canvas{opacity:.25}
+.qv-img.loading::after{content:"문제 불러오는 중…";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#777;font-size:13px}
+#qv-canvas{display:block;max-width:100%;height:auto}
+.qv-dock{position:sticky;bottom:0;width:calc(100% + 24px);margin-top:14px;background:var(--card);border-top:1px solid var(--line);
+  border-radius:0 0 var(--radius) var(--radius);padding:12px 12px 14px;display:flex;flex-direction:column;align-items:center;gap:10px}
+.qv-choices{display:flex;gap:12px}
+.qv-c{width:54px;height:54px;border-radius:50%;border:2px solid var(--line-strong);background:var(--card);font-size:24px;line-height:1;color:var(--ink);padding:0}
+.qv-c:hover{border-color:var(--ink-soft)}
+.qv-c.on{background:var(--ink);border-color:var(--ink);color:var(--card);font-weight:700}
+.qv-nav{display:flex;align-items:center;justify-content:space-between;width:100%;max-width:420px}
+.qv-nav .mini:disabled{opacity:.35}
+.qv-num{font-weight:800;font-size:15px;font-variant-numeric:tabular-nums}
+.crop-box{background:#fff;border-radius:6px;box-shadow:0 0 0 1px var(--line);margin:0 0 10px;padding:6px;min-height:80px;display:flex;justify-content:center;position:relative}
+.crop-box canvas{display:block;max-width:100%;height:auto}
+.crop-box.loading::after{content:"불러오는 중…";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#777;font-size:13px}
+.crop-box .mock-note{color:#555;padding:8px}
 .paper-empty{margin:auto;padding:30px 24px;text-align:center;max-width:420px}
 .paper-empty p{margin:0 0 12px;font-size:14px}
 .mock-file{display:inline-block;cursor:pointer}
 .paper-empty .mock-file{background:var(--accent-fill);border-color:var(--accent-fill);color:#fff;font-weight:600;padding:10px 18px;font-size:14px;margin-bottom:14px}
-.mock-omr{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);display:flex;flex-direction:column;min-height:0}
+.mock-omr{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);display:flex;flex-direction:column;min-height:0;
+  position:sticky;top:calc(var(--topbar-h,110px) + 62px);max-height:calc(100vh - var(--topbar-h,110px) - 80px)}
 .omr-head{padding:10px 12px;border-bottom:1px solid var(--line);font-weight:700;font-size:14px}
 .omr-head small{display:block;font-weight:400;font-size:11.5px;color:var(--ink-soft);margin-top:1px}
 .omr-list{overflow:auto;padding:8px 10px 12px;display:grid;grid-template-rows:repeat(25,auto);grid-auto-flow:column;gap:3px 12px;align-content:start}
 .omr-row{display:flex;align-items:center;gap:3px}
-.omr-n{width:22px;flex:none;text-align:right;font-size:12px;font-weight:700;color:var(--ink-soft);font-variant-numeric:tabular-nums;margin-right:3px}
+.omr-n{width:24px;flex:none;text-align:right;font-size:12px;font-weight:700;color:var(--ink-soft);font-variant-numeric:tabular-nums;margin-right:2px;
+  border:0;background:none;padding:0;cursor:pointer;border-radius:4px}
+.omr-n:hover{color:var(--accent);text-decoration:underline}
+.omr-row{border-radius:8px;padding:1px 3px 1px 0}
+.omr-row.cur{background:var(--accent-soft)}
+.omr-row.cur .omr-n{color:var(--accent)}
 .omr-b{width:26px;height:26px;border-radius:50%;border:1.5px solid var(--line-strong);background:var(--card);
   font-size:11.5px;color:var(--ink-soft);padding:0;line-height:1;font-variant-numeric:tabular-nums}
 .omr-b:hover{border-color:var(--ink-soft)}
@@ -583,9 +611,13 @@ main:has(#view-mock.active #mock-run:not(.hidden)){max-width:1360px}
 .wrong-sub{font-size:15px;margin:22px 0 12px}
 
 @media (max-width:860px){
-  .mock-grid{grid-template-columns:1fr;height:auto}
-  .mock-paper{height:70vh}
-  .mock-paper:has(.paper-empty){height:auto}
+  .mock-grid{grid-template-columns:1fr}
+  .mock-paper.is-full{height:75vh}
+  .mock-omr{position:static;max-height:none}
+  .qv{padding:8px 4px 0}
+  .qv-dock{width:calc(100% + 8px)}
+  .qv-c{width:48px;height:48px;font-size:21px}
+  .qv-choices{gap:9px}
   .mock-bar-btns{margin-left:0}
 }
 @media (max-width:480px){
