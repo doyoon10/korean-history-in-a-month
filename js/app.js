@@ -246,6 +246,7 @@
     if (name === "dash") renderDash();
     if (name === "wrong") renderWrong();
     if (name === "analysis") renderAnalysis();
+    if (name === "quiz") renderAdaptiveCard();
     if (name !== "mock") { pauseMock(); return stopMockTimer(); }
     // 푸는 중이면 멈춘 상태 그대로 보여 주고(시작은 직접 누른다), 결과 화면은 그대로 두고, 나머지는 회차 목록을 새로 그린다
     if (!$("#mock-run").classList.contains("hidden") && mockState().cur) {
@@ -314,6 +315,7 @@
       (p.concepts.length ? '<button class="mini" id="today-concept">개념 보기</button>' : "") +
       (p.concepts.length ? '<button class="mini" id="today-quiz">오늘 범위 문제 ' + nDay + " <small>새 " + uDay + "</small></button>" : "") +
       '<button class="mini" id="today-learned">배운 범위 누적 ' + nAll + " <small>새 " + uAll + "</small></button>" +
+      '<button class="mini adapt-btn" id="today-adapt">맞춤 10문제' + (dueIds().length ? " <small>복습 " + dueIds().length + "</small>" : "") + "</button>" +
       "</div>";
 
     $("#today-done").addEventListener("click", function () {
@@ -324,6 +326,7 @@
     var qbtn = $("#today-quiz");
     if (qbtn) qbtn.addEventListener("click", function () { startQuizFor(dayFilter(p), 10, "study"); });
     $("#today-learned").addEventListener("click", function () { startQuizFor(learnedFilter(p), 10, "study"); });
+    $("#today-adapt").addEventListener("click", function () { startAdaptive(10); });
   }
 
   function renderProgress() {
@@ -386,7 +389,8 @@
     var ids = (window.QUIZ || []).filter(function (q) { return q.era === era; })
       .map(function (q) { return q.id; });
     delete S.stats[era];
-    ids.forEach(function (id) { delete S.seen[id]; });
+    ids.forEach(function (id) { delete S.seen[id]; delete S.review[id]; });
+    Object.keys(S.mastery).forEach(function (t) { if (TOPIC_ERA[t] === era) delete S.mastery[t]; });
     S.wrong = S.wrong.filter(function (w) { return ids.indexOf(w.id) === -1; });
     save();
   }
@@ -394,7 +398,7 @@
   function initReset() {
     $("#acc-reset-all").addEventListener("click", function () {
       if (!confirm("모든 학습 기록을 지울까요?\n플랜 체크, 정답률, 오답 노트가 전부 사라집니다.")) return;
-      S = { done: {}, stats: {}, wrong: [], seen: {}, course: S.course };
+      S = { done: {}, stats: {}, wrong: [], seen: {}, course: S.course, mastery: {}, review: {}, adaptV: 1 };
       save();
       renderDash(); renderPlan(); renderWrong();
     });
@@ -594,8 +598,10 @@
       }
       var id = x.t.id;
       var cls = rangeDay != null ? (inRange.indexOf(id) !== -1 ? " in" : "") : (id === conceptCur ? " on" : "");
+      var lv = masteryLevel(masteryOf(id));
       html += '<button type="button" class="toc-item' + cls +
-        (today.indexOf(id) !== -1 ? " focus" : "") + '" data-topic-id="' + id + '">' + esc(x.t.title) + "</button>";
+        (today.indexOf(id) !== -1 ? " focus" : "") + '" data-topic-id="' + id + '">' +
+        (lv ? '<i class="mdot m-' + lv + '" title="숙련도 ' + pctOf(S.mastery[id].s) + '%"></i>' : "") + esc(x.t.title) + "</button>";
     });
     if (lastEra) html += "</div>";
     host.innerHTML = list.length ? html : '<p class="empty">검색 결과가 없습니다.</p>';
@@ -607,6 +613,11 @@
     }
   }
 
+  function masteryBadge(id) {
+    var m = masteryOf(id);
+    if (!m) return "";
+    return '<span class="m-badge m-' + masteryLevel(m) + '">숙련도 ' + pctOf(m.s) + "%</span>";
+  }
   function topicHtml(x, heading) {
     var t = x.t, era = x.era, seen = {};
     return '<section class="topic-page" id="topic-' + t.id + '">' + heading +
@@ -636,7 +647,7 @@
     var prev = TOPICS[i - 1], next = TOPICS[i + 1];
     $("#concept-crumb").innerHTML = esc(x.era.name) + " <span>" + (i + 1) + " / " + TOPICS.length + "</span>";
     $("#toc-current").textContent = t.title;
-    $("#concept-list").innerHTML = topicHtml(x, '<h2 class="topic-title">' + esc(t.title) + "</h2>");
+    $("#concept-list").innerHTML = topicHtml(x, '<h2 class="topic-title">' + esc(t.title) + masteryBadge(t.id) + "</h2>");
     $("#concept-nav").innerHTML =
       (prev ? '<button type="button" class="nav-prev" data-go="' + prev.t.id + '"><small>← 이전</small>' + esc(prev.t.title) + "</button>" : "<span></span>") +
       (next ? '<button type="button" class="nav-next" data-go="' + next.t.id + '"><small>다음 →</small>' + esc(next.t.title) + "</button>" : "<span></span>");
@@ -660,7 +671,7 @@
       html += ids.map(function (id, k) {
         var x = TOPICS[topicIndex(id)];
         return topicHtml(x, '<div class="range-head"><span class="range-num">' + (k + 1) + "</span>" +
-          '<div><div class="range-era">' + esc(x.era.name) + '</div><h3 class="range-topic">' + esc(x.t.title) + "</h3></div></div>");
+          '<div><div class="range-era">' + esc(x.era.name) + '</div><h3 class="range-topic">' + esc(x.t.title) + masteryBadge(x.t.id) + "</h3></div></div>");
       }).join("");
     }
     $("#concept-list").innerHTML = html;
@@ -874,6 +885,114 @@
     else pickTopic(p.concepts[0]);
   }
 
+  // ---------- 맞춤 학습: 주제 숙련도 · 복습 일정 ----------
+  // 주제마다 숙련도(0~1)를 두고 풀 때마다 최근 결과 쪽으로 당긴다. 최근에 맞히면 금방 오르고, 틀리면 바로 내려간다.
+  // 틀린 문제는 1일 → 3일 → 6일 뒤에 다시 내고, 세 번 연달아 맞히면 복습에서 뺀다.
+  // 문제를 고를 때는 복습 차례 → 안 푼 문제(약한 주제부터) → 틀렸던 문제 → 맞힌 문제(약한 주제부터) 순서다
+  var ALPHA = 0.35, ALPHA_MOCK = 0.45, REVIEW_DAYS = [1, 3, 6];
+
+  function addDays(d, n) {
+    var t = new Date(d + "T00:00:00");
+    t.setDate(t.getDate() + n);
+    return t.getFullYear() + "-" + pad(t.getMonth() + 1) + "-" + pad(t.getDate());
+  }
+  function learn(topicId, ok, alpha) {
+    if (!TOPIC_ERA[topicId]) return;
+    var m = S.mastery[topicId] || (S.mastery[topicId] = { s: 0.5, n: 0 });
+    m.s = m.s + alpha * ((ok ? 1 : 0) - m.s);
+    m.n++;
+    m.at = todayStr();
+  }
+  function schedule(qid, ok) {
+    if (!ok) { S.review[qid] = { box: 0, due: addDays(todayStr(), REVIEW_DAYS[0]) }; return; }
+    var r = S.review[qid];
+    if (!r) return;
+    r.box++;
+    if (r.box >= REVIEW_DAYS.length) delete S.review[qid];
+    else r.due = addDays(todayStr(), REVIEW_DAYS[r.box]);
+  }
+  function masteryOf(topicId) {
+    var m = S.mastery[topicId];
+    return m && m.n ? m : null;
+  }
+  function masteryLevel(m) {
+    if (!m) return "";
+    return m.s >= 0.8 ? "high" : m.s >= 0.6 ? "mid" : "low";
+  }
+  function pctOf(x) { return Math.round(x * 100); }
+  function dueIds() {
+    var t = todayStr();
+    return Object.keys(S.review).filter(function (id) { return S.review[id].due <= t && qById(id); });
+  }
+  // 약한 주제: 두 번 이상 풀었고 숙련도 60% 미만, 약한 순
+  function weakTopics() {
+    return Object.keys(S.mastery).filter(function (id) {
+      var m = S.mastery[id];
+      return m.n >= 2 && m.s < 0.6 && topicIndex(id) >= 0;
+    }).sort(function (a, b) { return S.mastery[a].s - S.mastery[b].s; });
+  }
+
+  // 처음 한 번: 이미 쌓인 기록(푼 문제, 오답 노트, 실전 기출)으로 숙련도와 복습 일정을 채운다
+  function initAdapt() {
+    if (!S.mastery) S.mastery = {};
+    if (!S.review) S.review = {};
+    if (S.adaptV) return;
+    var wrongIds = {};
+    S.wrong.forEach(function (w) { wrongIds[w.id] = true; });
+    var seen = Object.keys(S.seen).map(qById).filter(Boolean);
+    seen.filter(function (q) { return !wrongIds[q.id]; }).forEach(function (q) { learn(q.concept, true, ALPHA); });
+    seen.filter(function (q) { return wrongIds[q.id]; }).forEach(function (q) { learn(q.concept, false, ALPHA); });
+    S.wrong.forEach(function (w) { if (!S.review[w.id]) S.review[w.id] = { box: 0, due: todayStr() }; });
+    var M = mockState();
+    EXAMS.forEach(function (ex) {
+      (M.hist[ex.round] || []).forEach(function (rec) { learnMock(ex, rec.ans.split("").map(Number)); });
+    });
+    S.adaptV = 1;
+    save();
+  }
+  function learnMock(ex, ans) {
+    for (var i = 0; i < 50; i++) learn(ex.tags[i][0], ans[i] === +ex.ans[i], ALPHA_MOCK);
+  }
+
+  // 약한 주제 문제가 앞으로 오되, 한 주제가 몰리지 않게 같은 주제 안에서 뒤로 갈수록 조금씩 밀어낸다
+  function byNeed(list) {
+    var groups = {};
+    shuffle(list).forEach(function (q) { (groups[q.concept] = groups[q.concept] || []).push(q); });
+    var keyed = [];
+    Object.keys(groups).forEach(function (c) {
+      var m = masteryOf(c), w = 1 - (m ? m.s : 0.5);
+      groups[c].forEach(function (q, k) { keyed.push({ q: q, key: w - 0.15 * k + Math.random() * 0.2 }); });
+    });
+    keyed.sort(function (a, b) { return b.key - a.key; });
+    return keyed.map(function (x) { return x.q; });
+  }
+
+  // 맞춤 문제: 복습 차례 문제를 먼저, 나머지는 배운 범위(오늘 포함)에서 약한 주제 위주로
+  function adaptiveFilter() { return { concepts: conceptsUpTo(currentPlan().day) }; }
+  function adaptiveList(n) {
+    var due = shuffle(dueIds().map(qById));
+    var have = {};
+    due.forEach(function (q) { have[q.id] = true; });
+    var rest = pickQuestions(adaptiveFilter(), 0).filter(function (q) { return !have[q.id]; });
+    return due.concat(rest).slice(0, n);
+  }
+  function startAdaptive(n) {
+    startQuizFor(adaptiveFilter(), n, "study", adaptiveList(n));
+    run.adaptive = true;
+  }
+  function adaptiveSummary() {
+    var due = dueIds().length, weak = weakTopics();
+    var parts = [];
+    if (due) parts.push("복습 차례 <b>" + due + "문제</b>");
+    if (weak.length) parts.push("약한 주제 " + weak.slice(0, 3).map(function (id) { return esc(topicTitle(id)); }).join(", "));
+    return parts.length ? parts.join(" · ") : "풀수록 약한 주제와 틀린 문제 위주로 바뀝니다.";
+  }
+
+  function renderAdaptiveCard() {
+    var box = $("#quiz-adaptive-sum");
+    if (box) box.innerHTML = adaptiveSummary();
+  }
+
   // ---------- 문제 ----------
   var quizEras = ["all"], quizN = 10, quizMode = "study";
   var run = null;
@@ -920,6 +1039,8 @@
     $("#quiz-start").addEventListener("click", function () {
       startQuizFor(setupFilter(), quizN, quizMode);
     });
+    $("#quiz-adaptive-go").addEventListener("click", function () { startAdaptive(10); });
+    renderAdaptiveCard();
   }
 
   function setupFilter() {
@@ -936,36 +1057,59 @@
       if (eras.indexOf("all") !== -1) return true;
       return eras.indexOf(q.era) !== -1;
     });
-    // 안 푼 문제를 먼저, 그다음 틀렸던 문제, 마지막으로 이미 맞힌 문제
-    var wrongIds = {};
+    // 복습 차례 → 안 푼 문제(약한 주제부터) → 틀렸던 문제 → 이미 맞힌 문제(약한 주제부터)
+    var wrongIds = {}, t = todayStr();
     S.wrong.forEach(function (w) { wrongIds[w.id] = true; });
-    var fresh = [], wrong = [], done = [];
+    var due = [], fresh = [], wrong = [], done = [];
     pool.forEach(function (q) {
-      if (!S.seen[q.id]) fresh.push(q);
+      var r = S.review[q.id];
+      if (r && r.due <= t) due.push(q);
+      else if (!S.seen[q.id]) fresh.push(q);
       else if (wrongIds[q.id]) wrong.push(q);
       else done.push(q);
     });
-    pool = shuffle(fresh).concat(shuffle(wrong), shuffle(done));
+    pool = shuffle(due).concat(byNeed(fresh), shuffle(wrong), byNeed(done));
     return n > 0 ? pool.slice(0, n) : pool;
   }
   function countUnseen(filter) {
     return pickQuestions(filter, 0).filter(function (q) { return !S.seen[q.id]; }).length;
   }
   function questionStatus(q) {
+    var r = S.review[q.id];
+    if (r && r.due <= todayStr()) return "review";
     if (!S.seen[q.id]) return "fresh";
     return S.wrong.some(function (w) { return w.id === q.id; }) ? "wrong" : "again";
   }
 
-  function startQuizFor(filter, n, mode) {
-    var list = pickQuestions(filter, n);
+  function startQuizFor(filter, n, mode, preset) {
+    var list = preset || pickQuestions(filter, n);
     if (!list.length) { alert("해당 범위의 문제가 없습니다."); return; }
     run = { list: list, i: 0, answers: [], mode: mode || "study", filter: filter, n: n,
-      status: list.map(questionStatus) };
+      status: list.map(questionStatus), fb: [] };
     showView("quiz");
-    $("#quiz-setup").classList.add("hidden"); $("#quiz-official").classList.add("hidden");
+    $("#quiz-setup").classList.add("hidden"); $("#quiz-official").classList.add("hidden"); $("#quiz-adaptive").classList.add("hidden");
     $("#quiz-result").classList.add("hidden");
     $("#quiz-run").classList.remove("hidden");
     renderQuestion();
+  }
+
+  var STATUS_LABEL = { fresh: "처음 푸는 문제", wrong: "틀렸던 문제", again: "다시 푸는 문제",
+    review: "복습 차례", twin: "방금 틀린 주제 확인" };
+
+  // 채점 뒤: 이 주제 숙련도가 어떻게 바뀌었는지, 다음에 무엇이 바뀌는지 보여 준다
+  function adaptNote(q, f) {
+    if (!f) return "";
+    var title = topicTitle(q.concept), up = f.after >= f.before;
+    var html = '<div class="ex-adapt"><div class="ex-mastery">「' + esc(title) + "」 숙련도 " +
+      pctOf(f.before) + '% → <b class="' + (up ? "up" : "down") + '">' + pctOf(f.after) + "%</b> " + (up ? "▲" : "▼") + "</div>";
+    if (!f.ok) {
+      var notes = [];
+      if (f.twinAt != null) notes.push(f.twinAt - run.list.indexOf(q) <= 1 ? "다음에 같은 주제 문제가 한 번 더 나옵니다." : (f.twinAt - run.list.indexOf(q) - 1) + "문제 뒤에 같은 주제 문제가 한 번 더 나옵니다.");
+      notes.push("이 문제는 내일 복습 차례로 다시 냅니다.");
+      html += '<div class="ex-next">' + notes.join(" ") + "</div>" +
+        '<button type="button" class="mini" id="q-concept">개념 다시 보기</button>';
+    }
+    return html + "</div>";
   }
 
   function renderQuestion() {
@@ -983,7 +1127,7 @@
       (revealed ? '<span class="q-tag">' + esc(q.topic) + "</span>" : "") +
       '<span class="q-tag diff">난이도 ' + q.diff + "/5</span>" +
       (run.status ? '<span class="q-tag st-' + run.status[run.i] + '">' +
-        { fresh: "처음 푸는 문제", wrong: "틀렸던 문제", again: "다시 푸는 문제" }[run.status[run.i]] + "</span>" : "") +
+        STATUS_LABEL[run.status[run.i]] + "</span>" : "") +
       "</div>" +
       '<div class="q-stem">' + esc(q.stem) + "</div>" +
       (q.img ? figureHtml(q.img, revealed) : "") +
@@ -1004,7 +1148,8 @@
       var ok = picked === q.answer;
       html += '<div class="explain"><div class="ex-head ' + (ok ? "ok" : "no") + '">' +
         (ok ? "정답입니다" : "오답입니다 · 정답 " + (q.answer + 1) + "번") + "</div>" +
-        linkTerms(esc(q.explain), q.era, {}) + '<div class="ex-kw">핵심어 · ' + esc(q.keyword) + "</div></div>";
+        linkTerms(esc(q.explain), q.era, {}) + '<div class="ex-kw">핵심어 · ' + esc(q.keyword) + "</div>" +
+        adaptNote(q, run.fb && run.fb[run.i]) + "</div>";
     }
 
     html += '<div class="q-nav">' +
@@ -1019,6 +1164,8 @@
         pick(parseInt(b.dataset.idx, 10));
       });
     });
+    var cb = $("#q-concept");
+    if (cb) cb.addEventListener("click", function () { openConceptFor({ concepts: [q.concept] }); });
     $("#q-prev").addEventListener("click", function () {
       if (run.i > 0) { run.i--; renderQuestion(); }
     });
@@ -1033,7 +1180,10 @@
     if (run.mode === "study" && run.answers[run.i] !== undefined) return;
     run.answers[run.i] = idx;
     if (run.mode === "study") {
-      record(q, idx);
+      var f = record(q, idx);
+      if (!f.ok) f.twinAt = addTwin(q);
+      if (!run.fb) run.fb = [];
+      run.fb[run.i] = f;
       renderQuestion();
     } else {
       renderQuestion();
@@ -1043,8 +1193,33 @@
     }
   }
 
+  // 방금 틀린 주제에서 아직 이 판에 없는 문제 하나를 2문제 뒤에 끼운다 (안 푼 문제 먼저).
+  // 한 판에 최대 5개, 한 주제에 2개까지라 끝없이 늘어나지 않는다
+  function addTwin(q) {
+    run.twins = run.twins || 0;
+    run.twinBy = run.twinBy || {};
+    if (run.twins >= 5 || (run.twinBy[q.concept] || 0) >= 2) return null;
+    var inRun = {};
+    run.list.forEach(function (x) { inRun[x.id] = true; });
+    var cands = (window.QUIZ || []).filter(function (x) { return x.concept === q.concept && !inRun[x.id]; });
+    if (!cands.length) return null;
+    var fresh = cands.filter(function (x) { return !S.seen[x.id]; });
+    var twin = shuffle(fresh.length ? fresh : cands)[0];
+    var at = Math.min(run.i + 3, run.list.length);
+    run.list.splice(at, 0, twin);
+    if (run.answers.length > at) run.answers.splice(at, 0, undefined);
+    if (run.fb && run.fb.length > at) run.fb.splice(at, 0, undefined);
+    run.status.splice(at, 0, "twin");
+    run.twins++;
+    run.twinBy[q.concept] = (run.twinBy[q.concept] || 0) + 1;
+    return at;
+  }
+
   function record(q, idx) {
     var ok = idx === q.answer;
+    var before = masteryOf(q.concept) ? S.mastery[q.concept].s : 0.5;
+    learn(q.concept, ok, ALPHA);
+    schedule(q.id, ok);
     if (!S.stats[q.era]) S.stats[q.era] = { ok: 0, n: 0 };
     S.stats[q.era].n++;
     if (ok) S.stats[q.era].ok++;
@@ -1053,6 +1228,7 @@
     S.wrong = S.wrong.filter(function (w) { return w.id !== q.id; });
     if (!ok) S.wrong.unshift({ id: q.id, mine: idx, at: todayStr() });
     save();
+    return { ok: ok, before: before, after: S.mastery[q.concept] ? S.mastery[q.concept].s : before };
   }
 
   function finishQuiz() {
@@ -1090,7 +1266,8 @@
       '<div class="result-grade">' + grade + " · " + ok + " / " + total + "문항</div>" +
       '<p class="result-msg">' + msg + "</p>" +
       '<div class="result-actions">' +
-      '<button class="primary" id="res-again">같은 범위 다시</button>' +
+      '<button class="primary" id="res-again">' + (run.adaptive ? "맞춤 10문제 더" : "같은 범위 다시") + "</button>" +
+      (wrongList.length ? '<button class="mini" id="res-twins">틀린 주제만 더 풀기</button>' : "") +
       '<button class="mini" id="res-wrong">오답 노트 보기</button>' +
       '<button class="mini" id="res-home">설정으로</button>' +
       "</div></div>";
@@ -1110,14 +1287,22 @@
     $("#quiz-result").innerHTML = html;
 
     var last = run;
+    var wrongConcepts = [];
+    wrongList.forEach(function (w) { if (wrongConcepts.indexOf(w.q.concept) === -1) wrongConcepts.push(w.q.concept); });
+    var tw = $("#res-twins");
+    if (tw) tw.addEventListener("click", function () {
+      startQuizFor({ concepts: wrongConcepts }, Math.min(10, wrongConcepts.length * 3), "study");
+    });
     $("#res-again").addEventListener("click", function () {
       if (last.retryWrong) { $("#wrong-retry").click(); return; }
+      if (last.adaptive) { startAdaptive(10); return; }
       startQuizFor(last.filter, last.n, last.mode);
     });
     $("#res-wrong").addEventListener("click", function () { showView("wrong"); });
     $("#res-home").addEventListener("click", function () {
       $("#quiz-result").classList.add("hidden");
       $("#quiz-setup").classList.remove("hidden"); $("#quiz-official").classList.remove("hidden");
+      $("#quiz-adaptive").classList.remove("hidden"); renderAdaptiveCard();
     });
   }
 
@@ -1598,6 +1783,7 @@
     var rec = { at: todayStr(), score: sc.pts, right: sc.right,
       secs: Math.round(mockElapsed(cur)), ans: cur.ans.join("") };
     (M.hist[cur.round] = M.hist[cur.round] || []).push(rec);
+    learnMock(ex, cur.ans);
     M.cur = null;
     save();
     renderMockResult(ex.round, rec);
@@ -1777,7 +1963,7 @@
       run = { list: list, i: 0, answers: [], mode: "study", retryWrong: true, n: 0,
         status: list.map(function () { return "wrong"; }) };
       showView("quiz");
-      $("#quiz-setup").classList.add("hidden"); $("#quiz-official").classList.add("hidden");
+      $("#quiz-setup").classList.add("hidden"); $("#quiz-official").classList.add("hidden"); $("#quiz-adaptive").classList.add("hidden");
       $("#quiz-result").classList.add("hidden");
       $("#quiz-run").classList.remove("hidden");
       renderQuestion();
@@ -2105,6 +2291,29 @@
     }
     html += "</div>";
 
+    // 주제 숙련도: 약한 주제와 복습 일정
+    var weak = weakTopics(), t0 = todayStr(), t1 = addDays(t0, 1), rv = { today: 0, tomorrow: 0, later: 0 };
+    Object.keys(S.review).forEach(function (id) {
+      var d = S.review[id].due;
+      if (d <= t0) rv.today++; else if (d === t1) rv.tomorrow++; else rv.later++;
+    });
+    html += '<div class="card"><h2>약한 주제 <small>풀 때마다 바뀝니다</small></h2>';
+    if (weak.length) {
+      html += '<div class="ana-weak">' + weak.slice(0, 6).map(function (id) {
+        var m = S.mastery[id];
+        return '<div class="ana-wk"><span class="ana-wk-name">' + esc(topicTitle(id)) + "</span>" +
+          '<div class="bar"><i style="width:' + pctOf(m.s) + "%;background:" + accColor(pctOf(m.s)) + '"></i></div>' +
+          '<span class="ana-wk-pct">' + pctOf(m.s) + "%</span>" +
+          '<button type="button" class="mini" data-ana-topic="' + id + '">개념</button>' +
+          '<button type="button" class="mini" data-ana-tquiz="' + id + '">문제 5개</button></div>';
+      }).join("") + "</div>";
+    } else {
+      html += '<p class="ana-hint">아직 약한 주제가 없습니다. 같은 주제를 두 번 이상 풀었는데 숙련도가 60% 아래면 여기에 뜹니다.</p>';
+    }
+    html += '<div class="ana-review"><span>복습 일정</span><b>오늘 ' + rv.today + "</b><b>내일 " + rv.tomorrow + "</b><b>그 뒤 " + rv.later + "</b>" +
+      '<button type="button" class="primary small" id="ana-adapt">맞춤 10문제 시작</button></div>' +
+      '<p class="ana-hint">틀린 문제는 1일 → 3일 → 6일 뒤에 다시 나오고, 세 번 연달아 맞히면 복습에서 빠집니다.</p></div>';
+
     // 시대별 한눈에: 여지 큰 순, 데이터 부족은 아래로
     var rows = a.eras.filter(function (e) { return e.enough; }).sort(function (x, y) { return y.gain - x.gain; })
       .concat(a.eras.filter(function (e) { return !e.enough; }));
@@ -2130,6 +2339,11 @@
     $$("[data-ana-quiz]", box).forEach(function (b) {
       b.addEventListener("click", function () { startQuizFor({ eras: [b.dataset.anaQuiz] }, 10, "study"); });
     });
+    $$("[data-ana-tquiz]", box).forEach(function (b) {
+      b.addEventListener("click", function () { startQuizFor({ concepts: [b.dataset.anaTquiz] }, 5, "study"); });
+    });
+    var ad = $("#ana-adapt", box);
+    if (ad) ad.addEventListener("click", function () { startAdaptive(10); });
     $$("[data-goto-view]", box).forEach(function (b) {
       b.addEventListener("click", function () { showView(b.dataset.gotoView); });
     });
@@ -2152,6 +2366,14 @@
       if (e.mN) parts.push("실전 " + e.mOk + "/" + e.mN);
       L.push("- " + e.name + " (약 " + e.ratio + "문항): " + (parts.length ? parts.join(", ") + " · " + Math.round(e.acc * 100) + "%" : "아직 안 풀었음"));
     });
+    var weak = weakTopics();
+    if (weak.length) {
+      L.push("");
+      L.push("[숙련도가 낮은 주제] (최근 결과에 무게를 둔 정답률)");
+      weak.slice(0, 8).forEach(function (id) {
+        L.push("- " + topicTitle(id) + ": " + pctOf(S.mastery[id].s) + "% (" + S.mastery[id].n + "번 풂)");
+      });
+    }
     if (a.mocks.length) {
       L.push("");
       L.push("[실전 기출 점수] (회차별 가장 최근 응시)");
@@ -2272,6 +2494,7 @@
   }
 
   // ---------- 시작 ----------
+  initAdapt();
   initTheme();
   initGlossary();
   initTabs();
