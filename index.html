@@ -44,6 +44,7 @@
     <button class="tab" data-view="quiz" title="연습 문제"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg><span class="tab-name">연습 문제</span><span class="tab-short">문제</span></button>
     <button class="tab" data-view="mock" title="실전 기출"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13.5" r="7"/><path d="M12 10v3.5l2.5 2M9.5 3h5M12 3v3.5"/></svg><span class="tab-name">실전 기출</span><span class="tab-short">기출</span></button>
     <button class="tab" data-view="wrong" title="오답 노트"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h12v17l-6-4-6 4z"/><path d="M10 8.5l4 4M14 8.5l-4 4"/></svg><span class="tab-name">오답 노트</span><span class="tab-short">오답</span></button>
+    <button class="tab" data-view="analysis" title="약점 분석"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 20.5h17M6.5 17v-5M11 17V6M15.5 17v-3M20 17V9"/></svg><span class="tab-name">약점 분석</span><span class="tab-short">분석</span></button>
     <button class="tab" data-view="timeline" title="연표·암기"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h18M7 7v2.5M12 14.5V17M17 7v2.5"/><circle cx="7" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="17" cy="12" r="1.8" fill="currentColor"/></svg><span class="tab-name">연표·암기</span><span class="tab-short">연표</span></button>
   </nav>
   <div class="side-foot">학습 기록은 이 브라우저에만 저장됩니다.<br>문의: 26_07@bssm.hs.kr</div>
@@ -70,16 +71,6 @@
         <div class="stat"><span id="stat-topics">-</span><small>개념 주제</small></div>
         <div class="stat"><span id="stat-quiz">-</span><small>연습 문항</small></div>
       </div>
-    </div>
-
-    <div class="card ana-card">
-      <div class="card-head">
-        <h2>약점 분석</h2>
-        <button class="mini" id="ana-copy" type="button" title="내 기록을 질문 글로 복사합니다. Claude 같은 AI 채팅에 붙여 넣으세요">AI 상담용 복사</button>
-      </div>
-      <div id="analysis-box"></div>
-      <textarea id="ana-text" class="ana-text hidden" readonly aria-label="AI 상담용 글"></textarea>
-      <p class="ana-foot">점수 올릴 여지 = 시험 출제 비중 × 틀리는 비율. 실전 기출은 연습 문제보다 두 배로 칩니다. "AI 상담용 복사"를 누르고 Claude 같은 AI 채팅에 붙여 넣으면 틀리는 패턴과 남은 날 계획을 받아 볼 수 있습니다.</p>
     </div>
 
     <div class="dash-mid">
@@ -219,6 +210,23 @@
       <button class="mini danger" id="wrong-clear">오답 노트 비우기</button>
     </div>
     <div id="wrong-list"></div>
+  </section>
+
+  <!-- 약점 분석 -->
+  <section class="view" id="view-analysis">
+    <div class="view-head">
+      <h1>약점 분석</h1>
+      <p>어디를 고치면 점수가 가장 많이 오르는지 계산합니다. <b>시험 출제 비중 × 틀리는 비율</b>로 순위를 매기고, 실전 기출 답은 실제 시험에 가까워 연습 문제보다 두 배로 칩니다. 한 시대에서 5문항 이상 풀어야 순위에 들어갑니다.</p>
+    </div>
+    <div id="analysis-box"></div>
+    <div class="card ana-ai">
+      <div class="card-head">
+        <h2>AI에게 상담하기</h2>
+        <button class="primary small" id="ana-copy" type="button">AI 상담용 복사</button>
+      </div>
+      <p class="ana-hint">버튼을 누르면 시대별 정답률, 실전 점수, 틀린 문제가 질문 글로 정리되어 복사됩니다. Claude 같은 AI 채팅에 붙여 넣으면 자주 틀리는 패턴, 헷갈리는 개념 구분표, 남은 날 하루 단위 계획을 받아 볼 수 있습니다. 실전 기출은 저작권 때문에 문제 원문 없이 주제와 답만 들어가고, 사이트는 이 기록을 어디에도 보내지 않습니다.</p>
+      <textarea id="ana-text" class="ana-text hidden" readonly aria-label="AI 상담용 글"></textarea>
+    </div>
   </section>
 
   <!-- 연표 -->

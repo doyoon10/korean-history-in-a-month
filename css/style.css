@@ -172,7 +172,24 @@ details.strategy[open]>summary{margin-bottom:14px}
 .ana-thin .mini{padding:4px 11px;font-size:12.5px}
 .ana-text{display:block;width:100%;min-height:160px;margin-top:12px;padding:10px;border:1px solid var(--line);border-radius:10px;
   background:var(--surface-2);color:var(--ink);font:12.5px/1.6 ui-monospace,Menlo,monospace;resize:vertical}
-.ana-foot{margin:14px 0 0;font-size:12px;color:var(--ink-soft);line-height:1.6}
+.ana-goal{border-bottom:0;margin-bottom:0;padding-bottom:0}
+.ana-hint+.mini{margin-top:10px}
+.ana-rows{display:flex;flex-direction:column}
+.ana-row{display:grid;grid-template-columns:70px minmax(0,1fr) 44px 150px 76px;align-items:center;gap:12px;padding:7px 0;border-bottom:1px dashed var(--line);font-size:13px}
+.ana-row:last-child{border-bottom:0}
+.ana-row .bar{margin:0}
+.ana-row-name{font-weight:600}
+.ana-row-pct{font-weight:800;text-align:right}
+.ana-row-src{color:var(--ink-soft);font-size:12px}
+.ana-row-gain{text-align:right;font-weight:700;color:var(--accent);white-space:nowrap}
+.ana-row.dim{color:var(--ink-soft)}
+.ana-row.dim .ana-row-gain{color:var(--ink-soft);font-weight:500;font-size:12px}
+.ana-ai .ana-hint{margin-top:0}
+@media (max-width:600px){
+  .ana-row{grid-template-columns:64px minmax(0,1fr) 40px 64px;gap:8px}
+  .ana-row-src{grid-column:1 / -1;grid-row:2;margin-top:-4px;padding-left:72px}
+  .ana-gain{margin-left:0}
+}
 
 /* ---------- today ---------- */
 .today-day{font-size:12px;color:var(--accent);font-weight:700}
@@ -472,7 +489,7 @@ details.strategy[open]>summary{margin-bottom:14px}
   .dday{flex-direction:column;align-items:flex-end;gap:3px;padding:6px 10px;border-radius:10px}
   .dday-num{font-size:18px;letter-spacing:-.5px}
   .dday-label{font-size:10px}
-  .tabs{position:fixed;left:0;right:0;bottom:0;z-index:60;display:grid;grid-template-columns:repeat(7,1fr);gap:0;overflow:visible;
+  .tabs{position:fixed;left:0;right:0;bottom:0;z-index:60;display:grid;grid-template-columns:repeat(8,1fr);gap:0;overflow:visible;
     padding:4px 2px calc(4px + env(safe-area-inset-bottom));background:var(--topbar);
     backdrop-filter:saturate(180%) blur(12px);-webkit-backdrop-filter:saturate(180%) blur(12px);border-top:1px solid var(--line)}
   .tab{flex-direction:column;justify-content:center;gap:2px;padding:6px 0 4px;font-size:10.5px;border-radius:8px}

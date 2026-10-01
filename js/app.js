@@ -245,6 +245,7 @@
     window.scrollTo(0, 0);
     if (name === "dash") renderDash();
     if (name === "wrong") renderWrong();
+    if (name === "analysis") renderAnalysis();
     if (name !== "mock") { pauseMock(); return stopMockTimer(); }
     // 푸는 중이면 멈춘 상태 그대로 보여 주고(시작은 직접 누른다), 결과 화면은 그대로 두고, 나머지는 회차 목록을 새로 그린다
     if (!$("#mock-run").classList.contains("hidden") && mockState().cur) {
@@ -256,7 +257,6 @@
   function renderDash() {
     renderDday();
     renderToday();
-    renderAnalysis();
     renderProgress();
     renderAccuracy();
   }
@@ -2049,13 +2049,22 @@
     return i < 0 ? id : TOPICS[i].t.title;
   }
 
+  function accColor(pct) { return pct >= 80 ? "var(--green)" : pct >= 60 ? "var(--orange)" : "var(--bad)"; }
+  function eraSrc(e) {
+    var src = [];
+    if (e.mN) src.push("실전 " + e.mOk + "/" + e.mN);
+    if (e.pN) src.push("연습 " + e.pOk + "/" + e.pN);
+    return src.join(" · ");
+  }
+
   function renderAnalysis() {
     var box = $("#analysis-box");
     if (!box) return;
-    var a = analyze(), html = "";
+    var a = analyze(), left = Math.max(0, a.left), html = "";
 
     // 지금 점수와 목표까지 남은 점수
     var now = a.last ? a.last.score : (a.pN >= 20 ? Math.round(a.pOk / a.pN * 100) : null);
+    html += '<div class="card"><h2>지금 점수</h2>';
     if (now != null) {
       var basis = a.last ? "최근 실전 " + a.last.round + "회 (" + a.last.at.slice(5).replace("-", ".") + ")" : "연습 문제 정답률로 어림";
       var goals = [[80, "1급"], [70, "2급"], [60, "3급"]].map(function (g) {
@@ -2063,44 +2072,56 @@
         return '<span class="ana-gap' + (gap <= 0 ? " ok" : "") + '">' + g[1] + (gap <= 0 ? " 도달" : "까지 " + gap + "점") + "</span>";
       }).join("");
       html += '<div class="ana-goal"><div class="ana-now"><b>' + now + '</b><small>점</small></div>' +
-        '<div class="ana-goal-r"><div class="ana-basis">' + basis + " · " + gradeOf(now) + " · 시험까지 " + Math.max(0, a.left) + "일</div>" +
+        '<div class="ana-goal-r"><div class="ana-basis">' + basis + " · " + gradeOf(now) + " · 시험까지 " + left + "일</div>" +
         '<div class="ana-gaps">' + goals + "</div></div></div>";
+      if (a.mocks.length > 1) html += '<p class="ana-hint">실전 기록 · ' + a.mocks.map(function (m) { return m.round + "회 " + m.score + "점"; }).join(" → ") + "</p>";
     } else {
-      html += '<p class="ana-hint">실전 기출을 한 회 풀면 지금 점수와 등급까지 남은 점수가 여기에 뜹니다.</p>';
+      html += '<p class="ana-hint">실전 기출을 한 회 풀면 지금 점수와 등급까지 남은 점수가 여기에 뜹니다.</p>' +
+        '<button type="button" class="mini" data-goto-view="mock">실전 기출 풀러 가기</button>';
     }
+    html += "</div>";
 
     // 점수 올릴 여지가 큰 시대 TOP 3
+    html += '<div class="card"><h2>먼저 고칠 곳 <small>점수 올릴 여지 순</small></h2>';
     if (a.ranked.length) {
       html += '<ol class="ana-list">' + a.ranked.slice(0, 3).map(function (e, k) {
         var pct = Math.round(e.acc * 100);
-        var color = pct >= 80 ? "var(--green)" : pct >= 60 ? "var(--orange)" : "var(--bad)";
-        var src = [];
-        if (e.mN) src.push("실전 " + e.mOk + "/" + e.mN);
-        if (e.pN) src.push("연습 " + e.pOk + "/" + e.pN);
-        var chips = e.weak.slice(0, 3).map(function (id) {
+        var chips = e.weak.slice(0, 4).map(function (id) {
           return '<button type="button" class="kw ana-topic" data-ana-topic="' + id + '">' + esc(topicTitle(id)) + "</button>";
         }).join("");
         return '<li class="ana-item"><span class="ana-rank">' + (k + 1) + "</span>" +
           '<div class="ana-body"><div class="ana-line"><b class="ana-era">' + esc(e.name) + "</b>" +
-          '<span class="ana-pct" style="color:' + color + '">정답률 ' + pct + "%</span>" +
-          '<span class="ana-src">' + src.join(" · ") + " · 시험에 약 " + e.ratio + "문항</span>" +
+          '<span class="ana-pct" style="color:' + accColor(pct) + '">정답률 ' + pct + "%</span>" +
+          '<span class="ana-src">' + eraSrc(e) + " · 시험에 약 " + e.ratio + "문항</span>" +
           '<span class="ana-gain">최대 +' + (Math.round(e.gain * 10) / 10) + "점</span></div>" +
           (chips ? '<div class="ana-topics"><small>자주 틀린 주제</small>' + chips + "</div>" : "") +
           '<div class="ana-acts"><button type="button" class="mini" data-ana-quiz="' + e.id + '">이 시대 문제 10개</button></div></div></li>';
       }).join("") + "</ol>";
       var sum = a.ranked.slice(0, 3).reduce(function (t, e) { return t + e.gain; }, 0);
       html += '<p class="ana-hint">이 ' + Math.min(3, a.ranked.length) + "곳만 다 맞히게 되면 최대 <b>+" + Math.round(sum) +
-        "점</b>입니다. 남은 " + Math.max(0, a.left) + "일 동안 플랜 진도와 함께 하루 한 곳씩 돌아가며 개념 → 문제 10개 순서로 도세요.</p>";
-    } else if (!a.thin.length) {
-      html += '<p class="ana-hint">아직 분석할 만큼 푼 문제가 없습니다. 시대마다 ' + ANA_MIN + "문항 이상 풀면 약한 곳 순위가 나옵니다.</p>";
+        "점</b>입니다. 남은 " + left + "일 동안 플랜 진도와 함께 하루 한 곳씩 돌아가며 개념 → 문제 10개 순서로 도세요.</p>";
+    } else {
+      html += '<p class="ana-hint">아직 순위를 매길 만큼 푼 문제가 없습니다. 시대마다 ' + ANA_MIN + "문항 이상 풀면 약한 곳 순위가 나옵니다.</p>";
     }
+    html += "</div>";
 
-    // 배운 범위인데 푼 문제가 적은 시대
+    // 시대별 한눈에: 여지 큰 순, 데이터 부족은 아래로
+    var rows = a.eras.filter(function (e) { return e.enough; }).sort(function (x, y) { return y.gain - x.gain; })
+      .concat(a.eras.filter(function (e) { return !e.enough; }));
+    html += '<div class="card"><h2>시대별 한눈에</h2><div class="ana-rows">' + rows.map(function (e) {
+      var pct = e.acc == null ? 0 : Math.round(e.acc * 100);
+      return '<div class="ana-row' + (e.enough ? "" : " dim") + '"><span class="ana-row-name">' + esc(e.name) + "</span>" +
+        '<div class="bar"><i style="width:' + (e.enough ? pct : 0) + "%;background:" + accColor(pct) + '"></i></div>' +
+        '<span class="ana-row-pct">' + (e.enough ? pct + "%" : "-") + "</span>" +
+        '<span class="ana-row-src">' + (e.n ? eraSrc(e) : "안 풀었음") + "</span>" +
+        '<span class="ana-row-gain">' + (e.enough ? (e.gain >= 0.05 ? "+" + (Math.round(e.gain * 10) / 10) + "점" : "충분") : "데이터 부족") + "</span></div>";
+    }).join("") + "</div>";
     if (a.thin.length) {
       html += '<div class="ana-thin"><small>배웠는데 푼 문제가 적은 시대</small>' + a.thin.map(function (e) {
         return '<button type="button" class="mini" data-ana-quiz="' + e.id + '">' + esc(e.name) + " <small>" + e.n + "문항</small></button>";
       }).join("") + "</div>";
     }
+    html += "</div>";
     box.innerHTML = html;
 
     $$("[data-ana-topic]", box).forEach(function (b) {
@@ -2108,6 +2129,9 @@
     });
     $$("[data-ana-quiz]", box).forEach(function (b) {
       b.addEventListener("click", function () { startQuizFor({ eras: [b.dataset.anaQuiz] }, 10, "study"); });
+    });
+    $$("[data-goto-view]", box).forEach(function (b) {
+      b.addEventListener("click", function () { showView(b.dataset.gotoView); });
     });
   }
 
