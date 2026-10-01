@@ -256,6 +256,7 @@
   function renderDash() {
     renderDday();
     renderToday();
+    renderAnalysis();
     renderProgress();
     renderAccuracy();
   }
@@ -1987,6 +1988,202 @@
   }
 
 
+  // ---------- 약점 분석 ----------
+  // 어디를 고치면 점수가 가장 많이 오르나: 시험 출제 비중(문항 수) × 틀리는 비율 × 2점.
+  // 실전 기출은 연습 문제보다 실제 시험에 가까워 두 배로 쳐 준다. 푼 문항이 적은 시대는 순위에서 뺀다
+  var ANA_MIN = 5;
+
+  function analyze() {
+    var eras = (window.CONCEPTS || []).map(function (e) {
+      var st = S.stats[e.id] || { ok: 0, n: 0 };
+      return { id: e.id, name: e.short, ratio: e.ratio, pOk: st.ok, pN: st.n, mOk: 0, mN: 0, topics: {} };
+    });
+    var byId = {};
+    eras.forEach(function (e) { byId[e.id] = e; });
+    function miss(topicId, w) {
+      var e = byId[TOPIC_ERA[topicId]];
+      if (e) e.topics[topicId] = (e.topics[topicId] || 0) + w;
+    }
+    // 연습 문제: 오답 노트에 남아 있는 문제 (다시 맞히면 빠진다)
+    S.wrong.forEach(function (w) { var q = qById(w.id); if (q) miss(q.concept, 1); });
+    // 실전 기출: 회차마다 가장 최근 응시
+    var M = mockState(), mocks = [];
+    EXAMS.forEach(function (ex) {
+      var hist = M.hist[ex.round];
+      if (!hist || !hist.length) return;
+      var rec = hist[hist.length - 1], ans = rec.ans.split("").map(Number);
+      mocks.push({ round: ex.round, at: rec.at, score: rec.score, ex: ex, ans: ans });
+      for (var i = 0; i < 50; i++) {
+        var tag = ex.tags[i], e = byId[tagEra(tag)], ok = ans[i] === +ex.ans[i];
+        if (e) { e.mN++; if (ok) e.mOk++; }
+        if (!ok) miss(tag[0], 2);
+      }
+    });
+    mocks.sort(function (a, b) { return a.at < b.at ? -1 : a.at > b.at ? 1 : 0; });
+
+    // 배운 범위 = 완료 표시한 날까지 (오늘 범위는 아직 안 배운 것으로 본다)
+    var learned = {};
+    conceptsUpTo(currentPlan().day - 1).forEach(function (id) { learned[TOPIC_ERA[id]] = true; });
+    eras.forEach(function (e) {
+      var n = e.pN + 2 * e.mN, ok = e.pOk + 2 * e.mOk;
+      e.n = e.pN + e.mN;
+      e.acc = n ? ok / n : null;
+      e.enough = e.n >= ANA_MIN;
+      e.gain = e.enough ? (1 - e.acc) * e.ratio * 2 : 0;
+      e.learned = !!learned[e.id];
+      e.weak = Object.keys(e.topics).sort(function (a, b) { return e.topics[b] - e.topics[a]; });
+    });
+    var ranked = eras.filter(function (e) { return e.enough && e.gain >= 0.5; })
+      .sort(function (a, b) { return b.gain - a.gain; });
+    var thin = eras.filter(function (e) { return e.learned && !e.enough; });
+
+    var pOk = 0, pN = 0;
+    eras.forEach(function (e) { pOk += e.pOk; pN += e.pN; });
+    var last = mocks[mocks.length - 1] || null;
+    return { eras: eras, ranked: ranked, thin: thin, mocks: mocks, last: last, pOk: pOk, pN: pN,
+      left: daysBetween(todayStr(), window.EXAM_DATE) };
+  }
+
+  function topicTitle(id) {
+    var i = topicIndex(id);
+    return i < 0 ? id : TOPICS[i].t.title;
+  }
+
+  function renderAnalysis() {
+    var box = $("#analysis-box");
+    if (!box) return;
+    var a = analyze(), html = "";
+
+    // 지금 점수와 목표까지 남은 점수
+    var now = a.last ? a.last.score : (a.pN >= 20 ? Math.round(a.pOk / a.pN * 100) : null);
+    if (now != null) {
+      var basis = a.last ? "최근 실전 " + a.last.round + "회 (" + a.last.at.slice(5).replace("-", ".") + ")" : "연습 문제 정답률로 어림";
+      var goals = [[80, "1급"], [70, "2급"], [60, "3급"]].map(function (g) {
+        var gap = g[0] - now;
+        return '<span class="ana-gap' + (gap <= 0 ? " ok" : "") + '">' + g[1] + (gap <= 0 ? " 도달" : "까지 " + gap + "점") + "</span>";
+      }).join("");
+      html += '<div class="ana-goal"><div class="ana-now"><b>' + now + '</b><small>점</small></div>' +
+        '<div class="ana-goal-r"><div class="ana-basis">' + basis + " · " + gradeOf(now) + " · 시험까지 " + Math.max(0, a.left) + "일</div>" +
+        '<div class="ana-gaps">' + goals + "</div></div></div>";
+    } else {
+      html += '<p class="ana-hint">실전 기출을 한 회 풀면 지금 점수와 등급까지 남은 점수가 여기에 뜹니다.</p>';
+    }
+
+    // 점수 올릴 여지가 큰 시대 TOP 3
+    if (a.ranked.length) {
+      html += '<ol class="ana-list">' + a.ranked.slice(0, 3).map(function (e, k) {
+        var pct = Math.round(e.acc * 100);
+        var color = pct >= 80 ? "var(--green)" : pct >= 60 ? "var(--orange)" : "var(--bad)";
+        var src = [];
+        if (e.mN) src.push("실전 " + e.mOk + "/" + e.mN);
+        if (e.pN) src.push("연습 " + e.pOk + "/" + e.pN);
+        var chips = e.weak.slice(0, 3).map(function (id) {
+          return '<button type="button" class="kw ana-topic" data-ana-topic="' + id + '">' + esc(topicTitle(id)) + "</button>";
+        }).join("");
+        return '<li class="ana-item"><span class="ana-rank">' + (k + 1) + "</span>" +
+          '<div class="ana-body"><div class="ana-line"><b class="ana-era">' + esc(e.name) + "</b>" +
+          '<span class="ana-pct" style="color:' + color + '">정답률 ' + pct + "%</span>" +
+          '<span class="ana-src">' + src.join(" · ") + " · 시험에 약 " + e.ratio + "문항</span>" +
+          '<span class="ana-gain">최대 +' + (Math.round(e.gain * 10) / 10) + "점</span></div>" +
+          (chips ? '<div class="ana-topics"><small>자주 틀린 주제</small>' + chips + "</div>" : "") +
+          '<div class="ana-acts"><button type="button" class="mini" data-ana-quiz="' + e.id + '">이 시대 문제 10개</button></div></div></li>';
+      }).join("") + "</ol>";
+      var sum = a.ranked.slice(0, 3).reduce(function (t, e) { return t + e.gain; }, 0);
+      html += '<p class="ana-hint">이 ' + Math.min(3, a.ranked.length) + "곳만 다 맞히게 되면 최대 <b>+" + Math.round(sum) +
+        "점</b>입니다. 남은 " + Math.max(0, a.left) + "일 동안 플랜 진도와 함께 하루 한 곳씩 돌아가며 개념 → 문제 10개 순서로 도세요.</p>";
+    } else if (!a.thin.length) {
+      html += '<p class="ana-hint">아직 분석할 만큼 푼 문제가 없습니다. 시대마다 ' + ANA_MIN + "문항 이상 풀면 약한 곳 순위가 나옵니다.</p>";
+    }
+
+    // 배운 범위인데 푼 문제가 적은 시대
+    if (a.thin.length) {
+      html += '<div class="ana-thin"><small>배웠는데 푼 문제가 적은 시대</small>' + a.thin.map(function (e) {
+        return '<button type="button" class="mini" data-ana-quiz="' + e.id + '">' + esc(e.name) + " <small>" + e.n + "문항</small></button>";
+      }).join("") + "</div>";
+    }
+    box.innerHTML = html;
+
+    $$("[data-ana-topic]", box).forEach(function (b) {
+      b.addEventListener("click", function () { openConceptFor({ concepts: [b.dataset.anaTopic] }); });
+    });
+    $$("[data-ana-quiz]", box).forEach(function (b) {
+      b.addEventListener("click", function () { startQuizFor({ eras: [b.dataset.anaQuiz] }, 10, "study"); });
+    });
+  }
+
+  // AI 상담용: 내 기록을 질문 글로 정리해 클립보드에 넣는다. 사이트는 아무 데도 보내지 않는다
+  function analysisPrompt() {
+    var a = analyze(), L = [];
+    var p = currentPlan();
+    L.push("한국사능력검정시험 심화를 준비하고 있습니다. 아래 내 학습 기록을 보고 도와주세요.");
+    L.push("");
+    L.push("- 시험일: " + window.EXAM_DATE + " (남은 " + Math.max(0, a.left) + "일)");
+    L.push("- 목표: 1급(80점), 최소 3급(60점). 50문항 80분, 1·2·3점 배점");
+    L.push("- 학습 플랜 진도: 31일 중 DAY " + p.day + " (" + p.title + ")");
+    L.push("");
+    L.push("[시대별 정답률] (시험 출제 비중은 대략적인 문항 수)");
+    a.eras.forEach(function (e) {
+      var parts = [];
+      if (e.pN) parts.push("연습 " + e.pOk + "/" + e.pN);
+      if (e.mN) parts.push("실전 " + e.mOk + "/" + e.mN);
+      L.push("- " + e.name + " (약 " + e.ratio + "문항): " + (parts.length ? parts.join(", ") + " · " + Math.round(e.acc * 100) + "%" : "아직 안 풀었음"));
+    });
+    if (a.mocks.length) {
+      L.push("");
+      L.push("[실전 기출 점수] (회차별 가장 최근 응시)");
+      a.mocks.forEach(function (m) { L.push("- 제" + m.round + "회: " + m.score + "점 " + gradeOf(m.score) + " (" + m.at + ")"); });
+      L.push("");
+      L.push("[실전 기출에서 틀린 문항] (문제 원문은 저작권 때문에 주제만)");
+      a.mocks.forEach(function (m) {
+        var rows = [];
+        for (var i = 0; i < 50; i++) {
+          if (m.ans[i] === +m.ex.ans[i]) continue;
+          rows.push((i + 1) + "번 " + m.ex.tags[i][1] + " (" + (m.ans[i] ? "내 답 " + m.ans[i] : "무응답") + ", 정답 " + m.ex.ans[i] + ", " + m.ex.pts[i] + "점)");
+        }
+        if (rows.length) L.push("- 제" + m.round + "회: " + rows.join(" / "));
+      });
+    }
+    var wr = S.wrong.slice(0, 30).map(function (w) { return { w: w, q: qById(w.id) }; }).filter(function (x) { return x.q; });
+    if (wr.length) {
+      L.push("");
+      L.push("[연습 문제 오답] (최근 " + wr.length + "개)");
+      wr.forEach(function (x, k) {
+        var q = x.q, stem = q.stem.replace(/\s+/g, " ").trim();
+        if (stem.length > 140) stem = stem.slice(0, 140) + "…";
+        L.push((k + 1) + ". [" + (ERA_NAMES[q.era] || q.era) + " · " + q.topic + "] " + stem);
+        L.push("   내 답: " + (x.w.mine !== undefined ? q.choices[x.w.mine] : "무응답") + " / 정답: " + q.choices[q.answer]);
+      });
+    }
+    L.push("");
+    L.push("부탁할 것:");
+    L.push("1. 내가 자주 틀리는 패턴을 찾아 주세요 (헷갈리는 짝, 약한 문제 유형, 시대).");
+    L.push("2. 헷갈리는 개념은 구분법을 표로 정리해 주세요.");
+    L.push("3. 남은 " + Math.max(0, a.left) + "일 동안 하루 단위 공부 순서를 짜 주세요. 점수가 많이 오를 곳부터.");
+    return L.join("\n");
+  }
+
+  function initAnalysis() {
+    var btn = $("#ana-copy");
+    if (!btn) return;
+    btn.addEventListener("click", function () {
+      var text = analysisPrompt();
+      var done = function () {
+        btn.textContent = "복사됨 ✓";
+        setTimeout(function () { btn.textContent = "AI 상담용 복사"; }, 2200);
+      };
+      var fallback = function () {
+        var ta = $("#ana-text");
+        ta.value = text; ta.classList.remove("hidden");
+        ta.focus(); ta.select();
+        var ok = false;
+        try { ok = document.execCommand("copy"); } catch (e) {}
+        if (ok) done(); else btn.textContent = "아래 글을 직접 복사하세요";
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fallback);
+      else fallback();
+    });
+  }
+
   // ---------- 테마 ----------
   function currentTheme() {
     var t = document.documentElement.getAttribute("data-theme");
@@ -2061,6 +2258,7 @@
   initMock();
   initTimeline();
   initReset();
+  initAnalysis();
   initPlanCourse();
   renderPlan();
   renderDash();
