@@ -297,7 +297,121 @@
   }
   function countFor(filter) { return pickQuestions(filter, 0).length; }
 
+  // ---------- 진도 몰아치기: 정한 날까지 진도 끝내기 ----------
+  // 남은 진도(새 개념이 있는 날)를 오늘부터 마감일까지 고르게 나눠 "오늘 몫"으로 묶는다.
+  // 오늘 몫은 하루 동안 그대로 두고, 날이 바뀌면 남은 양으로 다시 나눈다
+  function sprintEnd() { return S.sprintEnd || ""; }
+  function sprintOn() { return !!sprintEnd(); }
+  function studyLeft() {
+    return courseDays().filter(function (p) { return p.concepts.length && !S.done[p.day]; });
+  }
+  function sprintBatch() {
+    var t = todayStr(), sp = S.sprint, course = S.course || "all";
+    if (!sp || sp.date !== t || sp.end !== sprintEnd() || sp.course !== course) {
+      var left = studyLeft();
+      var days = Math.max(1, daysBetween(t, sprintEnd()) + 1);
+      sp = S.sprint = { date: t, end: sprintEnd(), course: course,
+        days: left.slice(0, Math.ceil(left.length / days)).map(function (p) { return p.day; }) };
+      save();
+    }
+    return sp.days.map(planByDay).filter(Boolean);
+  }
+  // 오늘 몫을 다 끝냈을 때 다음 몫을 당겨 온다
+  function sprintMore() {
+    var left = studyLeft();
+    var days = Math.max(1, daysBetween(todayStr(), sprintEnd()));
+    sprintBatch();
+    S.sprint.days = S.sprint.days.concat(left.slice(0, Math.ceil(left.length / days)).map(function (p) { return p.day; }));
+    save();
+  }
+  // 오늘 볼 범위를 하루치처럼 묶은 것 (몰아치기 중이면 여러 날이 한 묶음)
+  function todayPlan() {
+    if (!sprintOn()) return currentPlan();
+    var b = sprintBatch();
+    if (!b.length) return currentPlan();
+    if (b.length === 1) return b[0];
+    var ids = [];
+    b.forEach(function (p) { ids = ids.concat(p.concepts); });
+    return { day: b[0].day + "~" + b[b.length - 1].day, batch: b, first: b[0].day, last: b[b.length - 1].day,
+      title: "오늘 몫 · " + b.length + "일 치", date: todayStr().slice(5), concepts: ids, todo: [], time: "" };
+  }
+  function todayDays() { var p = todayPlan(); return p.batch || [p]; }
+  function todayLastDay() { var p = todayPlan(); return p.last || p.day; }
+  function dateLabel(d) {
+    return (+d.slice(5, 7)) + "." + d.slice(8) + "(" + "일월화수목금토".charAt(new Date(d + "T00:00:00").getDay()) + ")";
+  }
+  function initSprint() {
+    // 처음 한 번: 기본 마감일이 아직 안 지났으면 켜 둔다
+    if (S.sprintEnd === undefined) {
+      S.sprintEnd = window.SPRINT_END && todayStr() <= window.SPRINT_END ? window.SPRINT_END : "";
+      save();
+    }
+  }
+
+  function renderSprintToday() {
+    var box = $("#today-box"), batch = sprintBatch(), left = studyLeft(), end = sprintEnd();
+    var dleft = daysBetween(todayStr(), end), examLeft = Math.max(0, daysBetween(todayStr(), window.EXAM_DATE));
+    var total = courseDays().filter(function (p) { return p.concepts.length; }).length;
+    var allDone = batch.every(function (p) { return S.done[p.day]; });
+
+    if (!left.length) {
+      box.innerHTML =
+        '<div class="today-day">진도 끝 · 시험까지 ' + examLeft + "일</div>" +
+        '<div class="today-title">이제 실전과 약점만 돌립니다</div>' +
+        '<ul class="today-todo"><li>실전 기출 한 회(80분)를 이틀에 한 번</li><li>맞춤 10문제는 매일</li>' +
+        "<li>약점 분석 1순위 시대 개념을 다시 읽기</li><li>시험 전날은 오답 노트와 연표만</li></ul>" +
+        '<div class="today-actions"><button class="mini adapt-btn" id="sp-adapt">맞춤 10문제</button>' +
+        '<button class="mini" data-sp-view="mock">실전 기출</button><button class="mini" data-sp-view="analysis">약점 분석</button></div>';
+    } else {
+      var topics = 0, fresh = 0, ids = [];
+      batch.forEach(function (p) { topics += p.concepts.length; ids = ids.concat(p.concepts); });
+      var remainTopics = 0;
+      batch.forEach(function (p) { if (!S.done[p.day]) remainTopics += p.concepts.length; });
+      var doneDays = total - left.length, pct = Math.round(doneDays / total * 100);
+      var when = dleft > 0 ? "마감 " + dateLabel(end) + "까지 오늘 포함 " + (dleft + 1) + "일" : dleft === 0 ? "오늘 " + dateLabel(end) + "이 마감" : "마감 " + dateLabel(end) + "이 " + (-dleft) + "일 지남";
+      box.innerHTML =
+        '<div class="today-day">진도 몰아치기 · ' + when + "</div>" +
+        '<div class="today-title">오늘 몫 ' + batch.length + "일 치 <small>주제 " + topics + "개</small></div>" +
+        '<div class="prog-row"><div class="prog-label"><span>전체 진도</span><small>' + doneDays + " / " + total + "일 치 · 남은 " + left.length + '일 치</small></div><div class="bar"><i style="width:' + pct + '%"></i></div></div>' +
+        '<ul class="sprint-list">' + batch.map(function (p) {
+          var done = !!S.done[p.day];
+          return '<li class="sp-item' + (done ? " done" : "") + '">' +
+            '<button class="plan-check' + (done ? " on" : "") + '" data-sp-check="' + p.day + '" aria-label="DAY ' + p.day + ' 완료 표시">' + (done ? "✓" : "") + "</button>" +
+            '<span class="sp-day">DAY ' + p.day + "</span>" +
+            '<span class="sp-title">' + esc(p.title) + " <small>주제 " + p.concepts.length + "</small></span>" +
+            '<button class="mini" data-sp-concept="' + p.day + '">개념</button>' +
+            '<button class="mini" data-sp-quiz="' + p.day + '">문제</button></li>';
+        }).join("") + "</ul>" +
+        '<p class="today-note">' + (allDone ? "오늘 몫을 다 끝냈습니다. 더 할 수 있으면 다음 몫을 당겨 오세요."
+          : "한 줄씩: 개념 읽기 → 문제 10개 → 체크. 남은 주제 " + remainTopics + "개, 읽기만 약 " + (remainTopics * 8) + "분입니다. 필기는 틀린 것만.") + "</p>" +
+        '<div class="today-actions">' +
+        (allDone ? '<button class="mini active" id="sp-more">다음 몫 당겨 하기</button>' : "") +
+        '<button class="mini" id="sp-read">오늘 몫 개념 이어 보기</button>' +
+        '<button class="mini" id="sp-quiz">오늘 몫 문제 20개 <small>새 ' + countUnseen({ concepts: ids }) + "</small></button>" +
+        '<button class="mini adapt-btn" id="sp-adapt">맞춤 10문제' + (dueIds().length ? " <small>복습 " + dueIds().length + "</small>" : "") + "</button></div>";
+      $("#sp-read").addEventListener("click", function () { showView("concept"); showRange("today"); });
+      $("#sp-quiz").addEventListener("click", function () { startQuizFor({ concepts: ids }, 20, "study"); });
+      var more = $("#sp-more");
+      if (more) more.addEventListener("click", function () { sprintMore(); renderToday(); renderPlan(); });
+    }
+    $("#sp-adapt").addEventListener("click", function () { startAdaptive(10); });
+    $$("[data-sp-view]", box).forEach(function (b) { b.addEventListener("click", function () { showView(b.dataset.spView); }); });
+    $$("[data-sp-check]", box).forEach(function (b) {
+      b.addEventListener("click", function () {
+        var d = b.dataset.spCheck;
+        S.done[d] = !S.done[d]; save(); renderToday(); renderProgress(); renderPlan();
+      });
+    });
+    $$("[data-sp-concept]", box).forEach(function (b) {
+      b.addEventListener("click", function () { openConceptFor(planByDay(b.dataset.spConcept)); });
+    });
+    $$("[data-sp-quiz]", box).forEach(function (b) {
+      b.addEventListener("click", function () { startQuizFor(dayFilter(planByDay(b.dataset.spQuiz)), 10, "study"); });
+    });
+  }
+
   function renderToday() {
+    if (sprintOn()) return renderSprintToday();
     var p = currentPlan();
     var box = $("#today-box");
     if (!p) { box.innerHTML = '<p class="empty">플랜 기간이 아닙니다.</p>'; return; }
@@ -419,10 +533,17 @@
 
   function renderPlan() {
     var host = $("#plan-list");
-    var today = currentPlan().day;
+    var todaySet = todayDays().map(function (d) { return d.day; });
     var planCourse = S.course || "all";
     var lastPhase = null;
-    var html = "";
+    var left = studyLeft();
+    var html = '<div class="card sprint-ctl"><div class="sprint-ctl-row"><b>진도 마감일</b>' +
+      '<input type="date" id="sprint-end" value="' + esc(sprintEnd()) + '" min="' + todayStr() + '" max="' + window.EXAM_DATE + '">' +
+      (sprintOn() ? '<button class="mini" id="sprint-off" type="button">끄기</button>' : "") + "</div>" +
+      '<p class="sprint-ctl-note">' + (sprintOn()
+        ? (left.length ? "남은 진도 <b>" + left.length + "일 치</b>를 " + dateLabel(sprintEnd()) + "까지 나눠서, 오늘 몫은 <b>" + todaySet.length + "일 치</b>입니다. 대시보드의 오늘의 학습에 순서대로 뜹니다."
+          : "진도를 모두 끝냈습니다. 이제 실전 기출과 약점 분석만 돌리세요.")
+        : "날짜를 고르면 남은 진도를 그날까지 고르게 나눠 하루 몫을 정해 줍니다.") + "</p></div>";
     if (planCourse === "core") {
       html += '<div class="card" style="padding:14px 16px;font-size:13.5px;color:var(--ink-soft)">' +
         "3급(60점) 목표 최소 코스입니다. 배점이 크고 출제 빈도가 높은 " +
@@ -437,7 +558,7 @@
         html += '<div class="phase-head"><h2>' + esc(ph.name) + "</h2><p>" + esc(ph.desc) + "</p></div>";
       }
       var done = !!S.done[p.day];
-      var isToday = p.day === today;
+      var isToday = todaySet.indexOf(p.day) !== -1;
       html +=
         '<div class="plan-item' + (isToday ? " today" : "") + (done ? " done" : "") + '" data-day="' + p.day + '">' +
         '<button class="plan-check' + (done ? " on" : "") + '" data-check="' + p.day + '">' + (done ? "✓" : "") + "</button>" +
@@ -455,6 +576,15 @@
     });
     host.innerHTML = html;
 
+    $("#sprint-end").addEventListener("change", function (e) {
+      S.sprintEnd = e.target.value || ""; S.sprint = null; save();
+      renderPlan(); renderToday(); renderConcept();
+    });
+    var off = $("#sprint-off");
+    if (off) off.addEventListener("click", function () {
+      S.sprintEnd = ""; S.sprint = null; save();
+      renderPlan(); renderToday(); renderConcept();
+    });
     $$("[data-check]", host).forEach(function (b) {
       b.addEventListener("click", function () {
         var d = b.dataset.check;
@@ -505,9 +635,18 @@
     else { for (var j = 0; j < days.length; j++) if (days[j].day > day) return days[j]; }
     return null;
   }
+  // rangeDay: 숫자면 그날 하루, "today"면 오늘 범위(몰아치기 중이면 오늘 몫 전체)
+  function rangePlan() {
+    if (rangeDay == null) return null;
+    return rangeDay === "today" ? todayPlan() : planByDay(rangeDay);
+  }
   function rangeIds() {
-    var p = rangeDay != null && planByDay(rangeDay);
+    var p = rangePlan();
     return p ? p.concepts.filter(function (id) { return topicIndex(id) >= 0; }) : [];
+  }
+  function rangeNeighbor(dir) {
+    var p = rangePlan();
+    return p ? nearDay(dir < 0 ? (p.first || p.day) : (p.last || p.day), dir) : null;
   }
 
   function initConcept() {
@@ -515,12 +654,12 @@
     if (topicIndex(conceptCur) < 0) conceptCur = TOPICS.length ? TOPICS[0].t.id : null;
     var mode = "range";
     try { mode = localStorage.getItem(MODE_KEY) || "range"; } catch (e) {}
-    rangeDay = mode === "range" ? currentPlan().day : null;
+    rangeDay = mode === "range" ? "today" : null;
 
     $("#concept-modes").addEventListener("click", function (e) {
       var b = e.target.closest("[data-mode]");
       if (!b) return;
-      if (b.dataset.mode === "range") showRange(currentPlan().day);
+      if (b.dataset.mode === "range") showRange("today");
       else pickTopic(conceptCur);
     });
     $("#concept-search").addEventListener("input", renderToc);
@@ -555,7 +694,7 @@
       if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
       var dir = e.key === "ArrowRight" ? 1 : -1;
       if (rangeDay != null) {
-        var d = nearDay(rangeDay, dir);
+        var d = rangeNeighbor(dir);
         if (d) showRange(d.day);
       } else {
         var x = TOPICS[topicIndex(conceptCur) + dir];
@@ -581,7 +720,7 @@
   function renderToc() {
     var q = $("#concept-search").value.trim().toLowerCase();
     var host = $("#concept-toc");
-    var inRange = rangeIds(), today = currentPlan().concepts;
+    var inRange = rangeIds(), today = todayPlan().concepts;
     var list = TOPICS.filter(function (x) {
       if (!q) return true;
       var t = x.t;
@@ -631,8 +770,7 @@
   }
 
   function paintModes() {
-    var today = currentPlan();
-    $("#mode-range-day").textContent = "DAY " + today.day;
+    $("#mode-range-day").textContent = "DAY " + todayPlan().day;
     $$("#concept-modes [data-mode]").forEach(function (b) {
       b.classList.toggle("active", (b.dataset.mode === "range") === (rangeDay != null));
     });
@@ -656,8 +794,8 @@
 
   // 오늘 범위: 그날 주제를 순서대로 이어 붙이고, 맨 위에 바로가기, 맨 아래에 앞뒤 날
   function renderRange() {
-    var p = planByDay(rangeDay), ids = rangeIds();
-    var isToday = p.day === currentPlan().day;
+    var p = rangePlan(), ids = rangeIds();
+    var isToday = rangeDay === "today" || p.day === todayPlan().day;
     $("#concept-crumb").innerHTML = (isToday ? "오늘 범위 · " : "") + "DAY " + p.day +
       " <span>" + p.date + " · " + (ids.length ? ids.length + "개 주제" : "복습일") + "</span>";
     $("#toc-current").textContent = "DAY " + p.day + " · " + p.title;
@@ -668,14 +806,18 @@
       if (ids.length > 1) html += '<div class="range-jump">' + ids.map(function (id, k) {
         return '<button type="button" class="mini" data-jump-topic="' + id + '"><b>' + (k + 1) + "</b> " + esc(TOPICS[topicIndex(id)].t.title) + "</button>";
       }).join("") + "</div>";
+      // 여러 날을 묶은 오늘 몫이면 날이 바뀌는 자리에 표시를 넣는다
+      var dayOf = {};
+      (p.batch || []).forEach(function (d) { d.concepts.forEach(function (id, j) { if (j === 0) dayOf[id] = d; }); });
       html += ids.map(function (id, k) {
-        var x = TOPICS[topicIndex(id)];
-        return topicHtml(x, '<div class="range-head"><span class="range-num">' + (k + 1) + "</span>" +
+        var x = TOPICS[topicIndex(id)], d = dayOf[id];
+        return (d ? '<div class="range-day"><b>DAY ' + d.day + "</b> " + esc(d.title) + "</div>" : "") +
+          topicHtml(x, '<div class="range-head"><span class="range-num">' + (k + 1) + "</span>" +
           '<div><div class="range-era">' + esc(x.era.name) + '</div><h3 class="range-topic">' + esc(x.t.title) + masteryBadge(x.t.id) + "</h3></div></div>");
       }).join("");
     }
     $("#concept-list").innerHTML = html;
-    var prev = nearDay(p.day, -1), next = nearDay(p.day, 1);
+    var prev = rangeNeighbor(-1), next = rangeNeighbor(1);
     $("#concept-nav").innerHTML =
       (prev ? '<button type="button" class="nav-prev" data-go-day="' + prev.day + '"><small>← DAY ' + prev.day + "</small>" + esc(prev.title) + "</button>" : "<span></span>") +
       (next ? '<button type="button" class="nav-next" data-go-day="' + next.day + '"><small>DAY ' + next.day + " →</small>" + esc(next.title) + "</button>" : "<span></span>");
@@ -687,7 +829,7 @@
     if (r.top < th) window.scrollBy({ top: r.top - th - 12, behavior: "smooth" });
   }
   function showRange(day) {
-    if (!planByDay(day)) return;
+    if (day !== "today" && !planByDay(day)) return;
     rangeDay = day;
     setMode("range");
     setTocOpen(false);
@@ -968,7 +1110,7 @@
   }
 
   // 맞춤 문제: 복습 차례 문제를 먼저, 나머지는 배운 범위(오늘 포함)에서 약한 주제 위주로
-  function adaptiveFilter() { return { concepts: conceptsUpTo(currentPlan().day) }; }
+  function adaptiveFilter() { return { concepts: conceptsUpTo(todayLastDay()) }; }
   function adaptiveList(n) {
     var due = shuffle(dueIds().map(qById));
     var have = {};
@@ -1044,7 +1186,7 @@
   }
 
   function setupFilter() {
-    if (quizEras[0] === "learned") return learnedFilter(currentPlan());
+    if (quizEras[0] === "learned") return { concepts: conceptsUpTo(todayLastDay()) };
     return { eras: quizEras };
   }
 
@@ -2494,6 +2636,7 @@
   }
 
   // ---------- 시작 ----------
+  initSprint();
   initAdapt();
   initTheme();
   initGlossary();

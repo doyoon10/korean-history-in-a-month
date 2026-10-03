@@ -186,6 +186,28 @@ details.strategy[open]>summary{margin-bottom:14px}
 .ana-row.dim .ana-row-gain{color:var(--ink-soft);font-weight:500;font-size:12px}
 .ana-ai .ana-hint{margin-top:0}
 
+/* ---------- 진도 몰아치기 ---------- */
+.today-title small{font-size:13px;font-weight:500;color:var(--ink-soft);margin-left:4px}
+.sprint-list{list-style:none;margin:12px 0 0;padding:0}
+.sp-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px dashed var(--line);font-size:14px}
+.sp-item:last-child{border-bottom:0}
+.sp-item .plan-check{margin-top:0}
+.sp-day{flex:none;width:52px;font-size:12px;font-weight:700;color:var(--accent)}
+.sp-title{flex:1;min-width:0;font-weight:600}
+.sp-title small{font-weight:400;font-size:11.5px;color:var(--ink-soft);margin-left:4px;white-space:nowrap}
+.sp-item .mini{padding:4px 11px;font-size:12px;flex:none}
+.sp-item.done .sp-title,.sp-item.done .sp-day{opacity:.45;text-decoration:line-through}
+.sprint-ctl{padding:14px 16px}
+.sprint-ctl-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.sprint-ctl-row b{color:var(--ink);font-size:14px}
+.sprint-ctl input{padding:6px 10px;border:1px solid var(--line);border-radius:9px;font:inherit;font-size:13.5px;background:var(--card);color:var(--ink)}
+.sprint-ctl-note{margin:8px 0 0;font-size:13px;color:var(--ink-soft);line-height:1.6}
+.range-day{margin:30px 0 -8px;padding:6px 12px;border-radius:9px;background:var(--accent-soft);color:var(--accent);font-size:13px}
+.range-day b{margin-right:4px}
+.range-jump+.range-day{margin-top:14px}
+.range-day+.topic-page{border-top:0;padding-top:0;margin-top:0}
+@media (max-width:480px){.sp-item{flex-wrap:wrap}.sp-title{flex-basis:calc(100% - 100px)}.sp-item .mini{margin-left:0}.sp-item .mini:first-of-type{margin-left:44px}}
+
 /* ---------- 맞춤 학습 ---------- */
 .mdot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:7px;vertical-align:1px}
 .m-low{--m:var(--bad)}.m-mid{--m:var(--orange)}.m-high{--m:var(--green)}
