@@ -140,8 +140,12 @@
             <button class="mini toc-show" id="toc-show" type="button" title="목차 펼치기">목차 »</button>
             <span class="topic-crumb" id="concept-crumb"></span>
           </div>
-          <button class="mini" id="note-toggle" type="button" aria-pressed="false">풀이 펼치기</button>
+          <div class="reader-tools-r">
+            <button class="mini" id="blank-toggle" type="button" aria-pressed="false" title="빨간 핵심어를 가리고 떠올려 보기">빈칸 모드</button>
+            <button class="mini" id="note-toggle" type="button" aria-pressed="false">풀이 펼치기</button>
+          </div>
         </div>
+        <p class="blank-hint">빨간 핵심어를 가렸습니다. 떠올린 다음 빈칸을 누르면 답이 보이고, 다시 누르면 가려집니다. 아래 풀이 줄, 핵심 키워드, 시험 포인트는 답이 보여서 숨겼습니다.</p>
         <div id="concept-list"></div>
         <div class="concept-nav" id="concept-nav"></div>
       </article>

@@ -120,9 +120,9 @@
     function target(node) {
       if (!node || !node.closest) return null;
       var t = node.closest(".term");
-      if (t) return t;
+      if (t) return isMasked(t) ? null : t;
       var n = node.closest(".nt-note, .nt-mark");
-      return n && !n.closest(".notes-open") ? n : null;
+      return n && !n.closest(".notes-open") && !isMasked(n) ? n : null;
     }
     // 본문 밑줄 단어는 같은 불릿의 짝 풀이를 보여 준다
     function noteOf(el) {
@@ -982,6 +982,39 @@
         (notes.length ? '<div class="nt-notes">' + notes.map(function (n, k) { return noteHtml(n, k, !!n.detail); }).join("") + "</div>" : "") +
         "</li>";
     }).join("");
+  }
+
+  // 빈칸 모드: 첫 줄의 빨간 핵심어(주체는 빼고)를 가려 두고, 누르면 보였다 가려졌다 한다
+  var BLANK_KEY = "hanneung_blank", BLANK_SEL = ".nt-main > b, .nt-main > .nt-mark > b";
+  function isMasked(el) {
+    if (!el.closest(".blank-on")) return false;
+    var b = el.closest("b") || el.querySelector("b");
+    return !!(b && b.matches(BLANK_SEL) && b.textContent && !b.classList.contains("shown"));
+  }
+  function initBlank() {
+    var btn = $("#blank-toggle"), main = $(".reader-main"), on = false;
+    try { on = localStorage.getItem(BLANK_KEY) === "1"; } catch (e) {}
+    function paint() {
+      main.classList.toggle("blank-on", on);
+      btn.classList.toggle("active", on);
+      btn.textContent = on ? "빈칸 끄기" : "빈칸 모드";
+      btn.setAttribute("aria-pressed", on ? "true" : "false");
+      if (!on) $$("b.shown", main).forEach(function (b) { b.classList.remove("shown"); });
+    }
+    btn.addEventListener("click", function () {
+      on = !on;
+      try { localStorage.setItem(BLANK_KEY, on ? "1" : "0"); } catch (e) {}
+      paint();
+    });
+    $("#concept-list").addEventListener("click", function (e) {
+      if (!on) return;
+      var b = e.target.closest && e.target.closest("b");
+      if (!b || !b.matches(BLANK_SEL) || !b.textContent) return;
+      b.classList.toggle("shown");
+      // 다시 가릴 때 떠 있던 풀이 말풍선이 답을 보여 주지 않게 닫는다
+      if (!b.classList.contains("shown")) { var pop = $("#gloss-pop"); if (pop) pop.hidden = true; }
+    });
+    paint();
   }
 
   // 파란 풀이는 평소엔 단어만 보이고 마우스를 올리면(탭하면) 뜬다. "풀이 펼치기"를 켜면 모두 펼쳐 보인다
@@ -2643,6 +2676,7 @@
   initTabs();
   initConcept();
   initNoteToggle();
+  initBlank();
   initQuiz();
   initWrong();
   initMock();

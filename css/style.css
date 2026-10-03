@@ -652,7 +652,18 @@ html.theme-vt::view-transition-new(root){animation-name:theme-fade-in}
 .toc-item.in{background:var(--accent-soft);color:var(--accent);font-weight:600}
 .toc-item.focus:not(.on):not(.in)::after{content:"오늘";display:inline-block;font-size:10px;font-weight:700;line-height:1.5;padding:0 5px;margin-left:6px;border-radius:4px;background:var(--hl-bg);color:var(--hl-ink);vertical-align:1px}
 .reader-main{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:22px 28px 22px;min-width:0}
-.reader-tools{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px}
+.reader-tools{display:flex;align-items:center;justify-content:space-between;gap:8px 10px;flex-wrap:wrap;margin-bottom:6px}
+.reader-tools-r{display:flex;gap:6px;flex:none}
+/* 빈칸 모드: 빨간 핵심어를 가린다 */
+.blank-hint{display:none;margin:6px 0 10px;padding:8px 12px;border-radius:9px;background:var(--hl-bg);color:var(--hl-ink);font-size:12.5px;line-height:1.6}
+.blank-on .blank-hint{display:block}
+.blank-on .nt-main>b:not(:empty),.blank-on .nt-main>.nt-mark>b:not(:empty){cursor:pointer;border-radius:5px;padding:1px 3px;-webkit-user-select:none;user-select:none}
+.blank-on .nt-main>b:not(:empty):not(.shown),.blank-on .nt-main>.nt-mark>b:not(:empty):not(.shown){
+  color:transparent !important;background:var(--chip-bg);box-shadow:inset 0 -2px 0 var(--accent-line)}
+.blank-on .nt-main>b:not(.shown) *,.blank-on .nt-main>.nt-mark>b:not(.shown) *{color:transparent !important;text-decoration-color:transparent !important}
+.blank-on .nt-main>b:not(:empty):not(.shown):hover,.blank-on .nt-main>.nt-mark>b:not(:empty):not(.shown):hover{background:var(--accent-soft)}
+.blank-on .nt-main b.shown{background:var(--hl-bg)}
+.blank-on .nt-notes,.blank-on .kw-row,.blank-on .tip{display:none}
 .topic-crumb{font-size:12.5px;font-weight:700;color:var(--accent)}
 .topic-crumb span{margin-left:6px;font-weight:500;color:var(--ink-soft)}
 #note-toggle{flex:none;white-space:nowrap}
