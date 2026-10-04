@@ -341,11 +341,14 @@
     return (+d.slice(5, 7)) + "." + d.slice(8) + "(" + "일월화수목금토".charAt(new Date(d + "T00:00:00").getDay()) + ")";
   }
   function initSprint() {
-    // 처음 한 번: 기본 마감일이 아직 안 지났으면 켜 둔다
-    if (S.sprintEnd === undefined) {
-      S.sprintEnd = window.SPRINT_END && todayStr() <= window.SPRINT_END ? window.SPRINT_END : "";
-      save();
+    // 기본 마감일이 아직 안 지났으면 켜 둔다. 기본 마감일이 바뀌면 따라가되, 직접 고른 날짜는 건드리지 않는다
+    var def = window.SPRINT_END || "", prev = S.sprintDefault || "2026-10-05";
+    if (S.sprintEnd === undefined || (def !== prev && S.sprintEnd === prev)) {
+      S.sprintEnd = def && todayStr() <= def ? def : "";
+      S.sprint = null;
     }
+    S.sprintDefault = def;
+    save();
   }
 
   function renderSprintToday() {

@@ -2,7 +2,7 @@
 window.EXAM_DATE = "2026-10-17";
 window.PLAN_START = "2026-09-16";
 // 이날까지 진도를 끝내도록 남은 날을 나눠 준다 (학습 플랜 탭에서 바꾸거나 끌 수 있다)
-window.SPRINT_END = "2026-10-05";
+window.SPRINT_END = "2026-10-06";
 
 window.PLAN = [
   { day:1, core:true,  date:"09-16", phase:1, title:"선사 시대 ~ 초기 국가", concepts:["pre-1","pre-2","pre-3","pre-4"], quizEra:["prehistory"], time:"90분",
