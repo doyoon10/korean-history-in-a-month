@@ -299,47 +299,57 @@
 
   // ---------- 진도 몰아치기: 정한 날까지 진도 끝내기 ----------
   // 남은 진도(새 개념이 있는 날)를 오늘부터 마감일까지 날짜별로 고르게 나눈 일정표를 만든다.
-  // S.sprint = { end, course, on: 마지막으로 정리한 날, late: [밀린 날 번호], plan: { 날짜: [날 번호] } }
+  // S.sprint = { end, startSet, from: 나누기 시작한 날, course, on: 마지막으로 정리한 날, late: [밀린 날 번호], plan: { 날짜: [날 번호] } }
+  // 시작하는 날(S.sprintStart)을 정하면 그날부터, 안 정하면 오늘부터 나눈다
   // 날이 바뀌면 지난 날짜에 못 끝낸 것을 late로 옮겨 "밀림"으로 보여 준다
   function sprintEnd() { return S.sprintEnd || ""; }
+  function sprintStart() { return S.sprintStart || ""; }
   function sprintOn() { return !!sprintEnd(); }
   function studyLeft() {
     return courseDays().filter(function (p) { return p.concepts.length && !S.done[p.day]; });
   }
-  function buildSprint(late) {
-    var t = todayStr(), end = sprintEnd();
+  // useStart: 정해 둔 시작하는 날이 이미 지났어도 그날부터 나눈다 (그 사이 몫은 밀린 것이 된다).
+  // 다시 나누기나 마감 늦추기처럼 오늘 기준으로 새로 짤 때는 지난 시작일을 쓰지 않는다
+  function buildSprint(late, useStart) {
+    var t = todayStr(), st = sprintStart();
+    var from = st && (useStart || st > t) ? st : t;
+    var end = sprintEnd() < from ? from : sprintEnd();
     late = late || [];
     var left = studyLeft().map(function (p) { return p.day; }).filter(function (d) { return late.indexOf(d) === -1; });
-    var n = Math.max(1, daysBetween(t, end) + 1), plan = {}, at = 0;
+    var n = daysBetween(from, end) + 1, plan = {}, at = 0;
     for (var i = 0; i < n; i++) {
       var size = Math.ceil((left.length - at) / (n - i));
-      if (size > 0) plan[addDays(t, i)] = left.slice(at, at + size);
+      if (size > 0) plan[addDays(from, i)] = left.slice(at, at + size);
       at += size;
     }
-    S.sprint = { end: end, course: S.course || "all", on: t, late: late, plan: plan };
+    S.sprint = { end: sprintEnd(), startSet: st, from: from, course: S.course || "all", on: t, late: late, plan: plan };
     save();
   }
   function sprintState() {
     var t = todayStr(), sp = S.sprint, course = S.course || "all";
-    if (!sp || !sp.plan || sp.end !== sprintEnd() || sp.course !== course) {
+    if (!sp || !sp.plan || sp.end !== sprintEnd() || sp.course !== course || (sp.startSet || "") !== sprintStart()) {
       // 예전 형식(그날 몫만 저장)에서 넘어올 때: 지난 날짜의 몫 중 못 끝낸 것은 밀린 것으로 본다
       var old = [];
       if (sp && !sp.plan && sp.days && sp.date < t && sp.end === sprintEnd() && sp.course === course) {
         old = sp.days.filter(function (d) { return !S.done[d]; });
       }
-      buildSprint(old);
+      buildSprint(old, false);
       sp = S.sprint;
-    } else if (sp.on !== t) {
-      var late = (sp.late || []).filter(function (d) { return !S.done[d]; });
-      Object.keys(sp.plan).forEach(function (d) {
-        if (d >= t) return;
-        sp.plan[d].forEach(function (x) { if (!S.done[x] && late.indexOf(x) === -1) late.push(x); });
-        delete sp.plan[d];
-      });
-      sp.late = late.sort(function (a, b) { return a - b; });
-      sp.on = t;
-      save();
     }
+    // 날이 바뀌면 어제까지 밀렸다가 끝낸 것은 목록에서 내린다
+    var late = sp.late || [], changed = false;
+    if (sp.on !== t) {
+      late = late.filter(function (d) { return !S.done[d]; });
+      sp.on = t; changed = true;
+    }
+    // 지난 날짜에 못 끝낸 몫은 밀린 것으로 옮긴다
+    Object.keys(sp.plan).forEach(function (d) {
+      if (d >= t) return;
+      sp.plan[d].forEach(function (x) { if (!S.done[x] && late.indexOf(x) === -1) late.push(x); });
+      delete sp.plan[d];
+      changed = true;
+    });
+    if (changed) { sp.late = late.sort(function (a, b) { return a - b; }); save(); }
     // 일정표에 없는 남은 진도(완료를 다시 푼 날 등)는 오늘 몫에 넣는다
     var have = {};
     (sp.late || []).forEach(function (d) { have[d] = true; });
@@ -375,7 +385,7 @@
   function sprintExtend() {
     var t = todayStr(), end = sprintEnd();
     S.sprintEnd = addDays(end < t ? t : end, 1);
-    buildSprint([]);
+    buildSprint([], false);
   }
   // 오늘 볼 범위를 하루치처럼 묶은 것 (몰아치기 중이면 여러 날이 한 묶음)
   function todayPlan() {
@@ -439,7 +449,9 @@
         if (!S.done[p.day]) remainTopics += p.concepts.length;
       });
       var doneDays = total - left.length, pct = Math.round(doneDays / total * 100);
-      var when = dleft > 0 ? "마감 " + dateLabel(end) + "까지 오늘 포함 " + (dleft + 1) + "일" : dleft === 0 ? "오늘 " + dateLabel(end) + "이 마감" : "마감 " + dateLabel(end) + "이 " + (-dleft) + "일 지남";
+      var st = sprintStart(), notYet = st > t;
+      var when = notYet ? dateLabel(st) + "에 시작 · " + dateLabel(end) + "까지"
+        : dleft > 0 ? "마감 " + dateLabel(end) + "까지 오늘 포함 " + (dleft + 1) + "일" : dleft === 0 ? "오늘 " + dateLabel(end) + "이 마감" : "마감 " + dateLabel(end) + "이 " + (-dleft) + "일 지남";
       var lateNote = "";
       if (lateLeft) {
         lateNote = '<div class="late-note"><b>진도가 ' + lateLeft + "일 치 밀렸습니다.</b> 지난 날짜에 못 끝낸 몫이라 아래 목록 맨 위에 '밀림'으로 올려 두었습니다." +
@@ -467,22 +479,25 @@
         '<div class="prog-row"><div class="prog-label"><span>전체 진도</span><small>' + doneDays + " / " + total + "일 치 · 남은 " + left.length + '일 치</small></div><div class="bar"><i style="width:' + pct + '%"></i></div></div>' +
         lateNote +
         (batch.length ? '<ul class="sprint-list">' + batch.map(function (p) { return sprintRow(p, lateIds.indexOf(p.day) !== -1); }).join("") + "</ul>"
-          : '<p class="sp-peek-empty">오늘로 잡힌 몫이 없습니다. 아래에서 다음 몫을 당겨 올 수 있습니다.</p>') +
-        '<p class="today-note">' + (allDone ? "오늘 몫을 다 끝냈습니다. 더 할 수 있으면 내일 몫을 당겨 오세요."
-          : "한 줄씩: 개념 → 문제 10개 → 체크. 남은 주제 " + remainTopics + "개, 읽기만 약 " + (remainTopics * 8) + "분입니다.") + "</p>" +
+          : '<p class="sp-peek-empty">' + (notYet ? "아직 시작 전입니다. " + dateLabel(st) + "부터 하루 몫이 뜹니다. 미리 하려면 아래 '내일 진도 보기'에서 당겨 오세요."
+            : "오늘로 잡힌 몫이 없습니다. 아래에서 다음 몫을 당겨 올 수 있습니다.") + "</p>") +
+        (batch.length ? '<p class="today-note">' + (allDone ? "오늘 몫을 다 끝냈습니다. 더 할 수 있으면 내일 몫을 당겨 오세요."
+          : "한 줄씩: 개념 → 문제 10개 → 체크. 남은 주제 " + remainTopics + "개, 읽기만 약 " + (remainTopics * 8) + "분입니다.") + "</p>" : "") +
         '<div class="today-actions">' +
-        '<button class="mini" id="sp-read">오늘 몫 개념 이어 보기</button>' +
-        '<button class="mini" id="sp-quiz">오늘 몫 문제 20개 <small>새 ' + countUnseen({ concepts: ids }) + "</small></button>" +
+        (batch.length ? '<button class="mini" id="sp-read">오늘 몫 개념 이어 보기</button>' +
+          '<button class="mini" id="sp-quiz">오늘 몫 문제 20개 <small>새 ' + countUnseen({ concepts: ids }) + "</small></button>" : "") +
         '<button class="mini adapt-btn" id="sp-adapt">맞춤 10문제' + (dueIds().length ? " <small>복습 " + dueIds().length + "</small>" : "") + "</button>" +
         '<button class="mini' + (sprintPeek ? " active" : "") + '" id="sp-peek">' + (sprintPeek ? "내일 진도 접기" : "내일 진도 보기") + "</button></div>" + peek;
-      $("#sp-read").addEventListener("click", function () { showView("concept"); showRange("today"); });
-      $("#sp-quiz").addEventListener("click", function () { startQuizFor({ concepts: ids }, 20, "study"); });
+      if (batch.length) {
+        $("#sp-read").addEventListener("click", function () { showView("concept"); showRange("today"); });
+        $("#sp-quiz").addEventListener("click", function () { startQuizFor({ concepts: ids }, 20, "study"); });
+      }
       $("#sp-peek").addEventListener("click", function () { sprintPeek = !sprintPeek; renderToday(); });
       var again = function () { renderToday(); renderPlan(); renderConcept(); };
       var more = $("#sp-more");
       if (more) more.addEventListener("click", function () { sprintMore(); again(); });
       var redo = $("#sp-redo");
-      if (redo) redo.addEventListener("click", function () { buildSprint([]); again(); });
+      if (redo) redo.addEventListener("click", function () { buildSprint([], false); again(); });
       ["#sp-extend", "#sp-extend2"].forEach(function (id) {
         var b = $(id);
         if (b) b.addEventListener("click", function () { sprintExtend(); again(); });
@@ -627,7 +642,7 @@
 
   function renderPlan() {
     var host = $("#plan-list");
-    var todaySet = todayDays().map(function (d) { return d.day; });
+    var todaySet = (sprintOn() ? sprintBatch() : todayDays()).map(function (d) { return d.day; });
     var planCourse = S.course || "all";
     var lastPhase = null;
     var left = studyLeft();
@@ -640,14 +655,18 @@
         sp.plan[k].forEach(function (d) { if (!tag[d]) tag[d] = '<span class="badge-date">' + (k === todayStr() ? "오늘" : dateLabel(k)) + " 몫</span>"; });
       });
     }
-    var html = '<div class="card sprint-ctl"><div class="sprint-ctl-row"><b>진도 마감일</b>' +
-      '<input type="date" id="sprint-end" value="' + esc(sprintEnd()) + '" min="' + todayStr() + '" max="' + window.EXAM_DATE + '">' +
+    var stShown = sprintStart() || todayStr();
+    var html = '<div class="card sprint-ctl"><div class="sprint-ctl-row"><b>진도 일정</b>' +
+      '<label>시작하는 날 <input type="date" id="sprint-start" value="' + esc(stShown) + '" max="' + window.EXAM_DATE + '"></label>' +
+      '<span class="sprint-tilde">~</span>' +
+      '<label>끝나는 날 <input type="date" id="sprint-end" value="' + esc(sprintEnd()) + '" max="' + window.EXAM_DATE + '"></label>' +
       (sprintOn() ? '<button class="mini" id="sprint-off" type="button">끄기</button>' : "") + "</div>" +
       '<p class="sprint-ctl-note">' + (sprintOn()
-        ? (left.length ? "남은 진도 <b>" + left.length + "일 치</b>를 " + dateLabel(sprintEnd()) + "까지 나눴습니다. 오늘 할 몫은 <b>" + todaySet.length + "일 치</b>" +
-            (sprintLate().length ? "(밀린 " + sprintLate().length + "일 치 포함)" : "") + "이고, 아래 목록에 날짜별 몫이 표시됩니다."
+        ? (left.length ? "남은 진도 <b>" + left.length + "일 치</b>를 " +
+            (sprintStart() > todayStr() ? dateLabel(sprintStart()) + "부터 " : "") + dateLabel(sprintEnd()) + "까지 나눴습니다. 오늘 할 몫은 <b>" + todaySet.filter(function (d) { return !S.done[d]; }).length + "일 치</b>" +
+            (sprintLate().length ? "(밀린 " + sprintLate().length + "일 치 포함)" : "") + "이고, 아래 목록에 날짜별 몫이 표시됩니다. 시작하는 날을 지난 날짜로 고르면 그 사이 몫은 밀린 것으로 표시됩니다."
           : "진도를 모두 끝냈습니다. 이제 실전 기출과 약점 분석만 돌리세요.")
-        : "날짜를 고르면 남은 진도를 그날까지 고르게 나눠 하루 몫을 정해 줍니다.") + "</p></div>";
+        : "시작하는 날과 끝나는 날을 고르면 남은 진도를 그 사이에 고르게 나눠 하루 몫을 정해 줍니다.") + "</p></div>";
     if (planCourse === "core") {
       html += '<div class="card" style="padding:14px 16px;font-size:13.5px;color:var(--ink-soft)">' +
         "3급(60점) 목표 최소 코스입니다. 배점이 크고 출제 빈도가 높은 " +
@@ -680,10 +699,19 @@
     });
     host.innerHTML = html;
 
-    $("#sprint-end").addEventListener("change", function (e) {
-      S.sprintEnd = e.target.value || ""; S.sprint = null; save();
+    // 날짜를 바꾸면 남은 진도를 새 기간에 다시 나눈다. 시작하는 날을 직접 고쳤을 때만 지난 날짜부터 나눈다
+    function setRange(startChanged) {
+      var st = $("#sprint-start").value || "", en = $("#sprint-end").value || "";
+      // 두 날짜가 뒤바뀌면 방금 고친 쪽을 살리고 다른 쪽을 맞춘다
+      if (st && en && en < st) { if (startChanged) en = st; else st = en < todayStr() ? en : ""; }
+      S.sprintStart = st === todayStr() && !startChanged ? sprintStart() : st;
+      S.sprintEnd = en;
+      if (en) buildSprint([], startChanged); else S.sprint = null;
+      save();
       renderPlan(); renderToday(); renderConcept();
-    });
+    }
+    $("#sprint-start").addEventListener("change", function () { setRange(true); });
+    $("#sprint-end").addEventListener("change", function () { setRange(false); });
     var off = $("#sprint-off");
     if (off) off.addEventListener("click", function () {
       S.sprintEnd = ""; S.sprint = null; save();
