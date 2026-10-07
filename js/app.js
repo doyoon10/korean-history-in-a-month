@@ -998,13 +998,18 @@
       out += "</span>"; mark = null;
       if (bold) flipB(true);
     }
-    // 연도만 든 괄호는 흐리게 보인다(순서만 알면 된다). 굵은 글씨에 붙은 연도는 큰 사건이라 그대로 둔다
+    // 괄호를 세 갈래로 나눈다.
+    //   기본: 빨간 핵심어에 붙었거나 안에 굵은 글씨가 든 괄호 (늘 보인다)
+    //   sub : 보통 글씨에 붙은 괄호 ('핵심'에서는 숨긴다)
+    //   yr·skip : 보통 글씨에 붙은 연도, 걸러 낸 괄호 ('전부'에서만 회색으로 보인다)
     function putParens(all) {
       while (pi < parens.length && (all || parens[pi].pos <= p)) {
-        var h = parens[pi++].html;
-        var yr = !bold && boldEnd !== p && YEAR_ONLY.test(h.replace(/<[^>]+>/g, ""));
+        var it = parens[pi++], h = it.html;
+        var onKey = bold || boldEnd === p;
+        var cls = it.skip ? " skip" : !onKey && YEAR_ONLY.test(h.replace(/<[^>]+>/g, "")) ? " yr"
+          : !onKey && h.indexOf("<b>") === -1 ? " sub" : "";
         if (bold) flipB(false);
-        out += '<span class="nt-inl' + (yr ? " yr" : "") + '">(' + h + ")</span>";
+        out += '<span class="nt-inl' + cls + '">(' + h + ")</span>";
         if (bold) flipB(true);
       }
     }
@@ -1050,6 +1055,8 @@
     // pos: 원래 괄호가 있던 자리 (굵게 표시를 뺀 글자 위치)
     function parenNote(n, at, pos) {
       var note = { label: n.label, at: at, pos: pos, detail: linkTerms(fmt(readable(n.text)), era, {}) };
+      // 걸러 낸 괄호(뜻풀이·반복·곁가지)는 '괄호 전부'에서만 보인다
+      note.skip = ((window.NOTE_SKIP || {})[topicId] || []).indexOf(n.label + "|" + n.text) !== -1;
       var easy = (window.NOTE_EASY || {})[topicId + "|" + n.label];
       var term = glossInLabel(n.label, era);
       if (easy) {
@@ -1108,7 +1115,7 @@
       // 괄호 내용은 원래 자리에도 숨겨 둔다 (펼치기 모드에서 필기 모양 그대로 보이고, 아래 풀이에서는 뜻만 보임)
       var subjParens = [], bodyParens = [];
       notes.forEach(function (n, k) {
-        if (n.detail) (k < subjNotes.length ? subjParens : bodyParens).push({ pos: n.pos, html: n.detail });
+        if (n.detail) (k < subjNotes.length ? subjParens : bodyParens).push({ pos: n.pos, html: n.detail, skip: n.skip });
       });
       function byPos(x, y) { return x.pos - y.pos; }
 
@@ -1154,7 +1161,7 @@
   }
 
   // 파란 풀이는 평소엔 단어만 보이고 마우스를 올리면(탭하면) 뜬다. "풀이 펼치기"를 켜면 모두 펼쳐 보인다
-  var NOTES_KEY = "hanneung_notes_open";
+  var NOTES_KEY = "hanneung_notes_open", PAREN_KEY = "hanneung_paren_mode";
   function initNoteToggle() {
     var btn = $("#note-toggle"), list = $("#concept-list");
     var open = false;
@@ -1165,6 +1172,21 @@
       btn.textContent = open ? "풀이 접기" : "풀이 펼치기";
       btn.setAttribute("aria-pressed", open ? "true" : "false");
     }
+    // 괄호를 얼마나 보일지: 핵심(빨간 말에 붙은 것만) / 기본(걸러 낸 것 빼고) / 전부
+    var pm = "std";
+    try { pm = localStorage.getItem(PAREN_KEY) || "std"; } catch (e) {}
+    function paintPm() {
+      ["key", "std", "all"].forEach(function (m) { list.classList.toggle("pm-" + m, m === pm); });
+      $$("#paren-mode [data-pm]").forEach(function (b) { b.classList.toggle("active", b.dataset.pm === pm); });
+    }
+    $("#paren-mode").addEventListener("click", function (e) {
+      var b = e.target.closest("[data-pm]");
+      if (!b) return;
+      pm = b.dataset.pm;
+      try { localStorage.setItem(PAREN_KEY, pm); } catch (er) {}
+      paintPm();
+    });
+    paintPm();
     // 본문 밑줄 단어와 아래 풀이 단어 중 하나에 올리면 짝도 같이 강조
     function pair(el, on) {
       var li = el.closest("li.nt");

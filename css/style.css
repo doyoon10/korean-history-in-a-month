@@ -670,7 +670,7 @@ html.theme-vt::view-transition-new(root){animation-name:theme-fade-in}
 .toc-item.focus:not(.on):not(.in)::after{content:"오늘";display:inline-block;font-size:10px;font-weight:700;line-height:1.5;padding:0 5px;margin-left:6px;border-radius:4px;background:var(--hl-bg);color:var(--hl-ink);vertical-align:1px}
 .reader-main{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:22px 28px 22px;min-width:0}
 .reader-tools{display:flex;align-items:center;justify-content:space-between;gap:8px 10px;flex-wrap:wrap;margin-bottom:6px}
-.reader-tools-r{display:flex;gap:6px;flex:none}
+.reader-tools-r{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;align-items:center}
 /* 빈칸 모드: 빨간 핵심어를 가린다 */
 .blank-hint{display:none;margin:6px 0 10px;padding:8px 12px;border-radius:9px;background:var(--hl-bg);color:var(--hl-ink);font-size:12.5px;line-height:1.6}
 .blank-on .blank-hint{display:block}
@@ -758,7 +758,14 @@ html.theme-vt::view-transition-new(root){animation-name:theme-fade-in}
 .nt-inl{display:none;color:var(--blue);font-weight:400}
 .nt-inl b{color:inherit;font-weight:700}
 .notes-open .nt-inl{display:inline}
-.nt-inl.yr{color:var(--ink-soft);opacity:.75}
+/* 괄호 걸러 보기: 걸러 낸 것과 그냥 연도는 '전부'에서만, 보통 글씨에 붙은 것은 '핵심'에서 숨긴다 */
+.notes-open .nt-inl.skip,.notes-open .nt-inl.yr{display:none}
+.notes-open.pm-key .nt-inl.sub{display:none}
+.notes-open.pm-all .nt-inl.skip,.notes-open.pm-all .nt-inl.yr{display:inline;color:var(--ink-soft);opacity:.75}
+.paren-mode{display:none;align-items:center;gap:4px;margin-right:6px}
+.reader-main:has(#concept-list.notes-open) .paren-mode{display:flex}
+.paren-mode>span{font-size:12px;color:var(--ink-soft);margin-right:2px}
+.paren-mode .mini{padding:4px 10px;font-size:12px}
 .notes-open .nt-note.inl .nt-detail{display:none}
 /* 호버 풀이: 종류 · 제목 / 쉬운 뜻 / 참고 */
 #gloss-pop .gp-head{display:flex;align-items:baseline;gap:6px}
