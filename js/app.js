@@ -989,23 +989,27 @@
   // ** 굵게와 줄바꿈(\n = ' / ')이 섞인 원문을 그리면서, 풀이가 달린 범위에 밑줄 span을 씌운다.
   // ranges: 굵게 표시를 뺀 글자 위치 기준 [{s, e, k}], 겹치지 않게 정렬된 상태
   // parens: 원래 괄호 [{pos, html}] (pos 순). 제자리에 숨겨 두고 "풀이 펼치기"일 때 파란 괄호로 보인다
+  var YEAR_ONLY = /^[\d~.,\s년월일세기BC전후경초말중반C]+$/;
   function renderMarked(raw, ranges, parens) {
-    var out = "", p = 0, bold = false, mark = null, ri = 0, pi = 0;
+    var out = "", p = 0, bold = false, mark = null, ri = 0, pi = 0, boldEnd = -1;
     function flipB(on) { out += on ? "<b>" : "</b>"; }
     function closeMark() {
       if (bold) flipB(false);
       out += "</span>"; mark = null;
       if (bold) flipB(true);
     }
+    // 연도만 든 괄호는 흐리게 보인다(순서만 알면 된다). 굵은 글씨에 붙은 연도는 큰 사건이라 그대로 둔다
     function putParens(all) {
       while (pi < parens.length && (all || parens[pi].pos <= p)) {
+        var h = parens[pi++].html;
+        var yr = !bold && boldEnd !== p && YEAR_ONLY.test(h.replace(/<[^>]+>/g, ""));
         if (bold) flipB(false);
-        out += '<span class="nt-inl">(' + parens[pi++].html + ")</span>";
+        out += '<span class="nt-inl' + (yr ? " yr" : "") + '">(' + h + ")</span>";
         if (bold) flipB(true);
       }
     }
     for (var i = 0; i < raw.length; ) {
-      if (raw.substr(i, 2) === "**") { bold = !bold; flipB(bold); i += 2; continue; }
+      if (raw.substr(i, 2) === "**") { bold = !bold; if (!bold) boldEnd = p; flipB(bold); i += 2; continue; }
       if (mark && p === mark.e) closeMark();
       putParens(false);
       if (!mark && ri < ranges.length && p === ranges[ri].s) {

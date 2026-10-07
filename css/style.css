@@ -729,6 +729,7 @@ html.theme-vt::view-transition-new(root){animation-name:theme-fade-in}
 
 /* 손필기 모양 개념 정리 */
 .note-blue{color:var(--blue);font-weight:600}
+.note-gray{color:var(--ink-soft);font-weight:600}
 .topic-body li.nt{margin-bottom:16px}
 .nt-main{display:block}
 .nt-subj{color:var(--accent);font-weight:700}
@@ -757,6 +758,7 @@ html.theme-vt::view-transition-new(root){animation-name:theme-fade-in}
 .nt-inl{display:none;color:var(--blue);font-weight:400}
 .nt-inl b{color:inherit;font-weight:700}
 .notes-open .nt-inl{display:inline}
+.nt-inl.yr{color:var(--ink-soft);opacity:.75}
 .notes-open .nt-note.inl .nt-detail{display:none}
 /* 호버 풀이: 종류 · 제목 / 쉬운 뜻 / 참고 */
 #gloss-pop .gp-head{display:flex;align-items:baseline;gap:6px}
