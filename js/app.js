@@ -756,7 +756,9 @@
   });
   var conceptCur = null, rangeDay = null;
   // 기출 오답 보기: 실전 기출에서 틀린 문항과 이어진 줄만 모아 보여 준다
-  var wrongOn = false, wrongRound = null, wrongFull = {};
+  // wrongView: "key"(풀이만) | "lines"(필기 줄까지). wrongShow: 주제마다 따로 펼친 상태 ("key" | "lines" | "full")
+  var wrongOn = false, wrongRound = null, wrongView = "key", wrongShow = {};
+  var WRONG_VIEW_KEY = "hanneung_wrong_view";
 
   function topicIndex(id) {
     for (var i = 0; i < TOPICS.length; i++) if (TOPICS[i].t.id === id) return i;
@@ -794,6 +796,7 @@
     try { mode = localStorage.getItem(MODE_KEY) || "range"; } catch (e) {}
     rangeDay = mode === "range" ? "today" : null;
     wrongOn = mode === "wrong";
+    try { if (localStorage.getItem(WRONG_VIEW_KEY) === "lines") wrongView = "lines"; } catch (e) {}
 
     $("#concept-modes").addEventListener("click", function (e) {
       var b = e.target.closest("[data-mode]");
@@ -815,8 +818,16 @@
       if (b) { jumpTo(b.dataset.jumpTopic); return; }
       var r = e.target.closest("[data-wround]");
       if (r) { wrongRound = r.dataset.wround ? +r.dataset.wround : null; renderConcept(); return; }
-      var f = e.target.closest("[data-wfull]");
-      if (f) { wrongFull[f.dataset.wfull] = !wrongFull[f.dataset.wfull]; renderConcept(); jumpTo(f.dataset.wfull); return; }
+      var f = e.target.closest("[data-wshow]");
+      if (f) { wrongShow[f.dataset.wtopic] = f.dataset.wshow; renderConcept(); jumpTo(f.dataset.wtopic); return; }
+      var v = e.target.closest("[data-wview]");
+      if (v) {
+        wrongView = v.dataset.wview;
+        wrongShow = {};
+        try { localStorage.setItem(WRONG_VIEW_KEY, wrongView); } catch (err) {}
+        renderConcept();
+        return;
+      }
       var go = e.target.closest("[data-wgo]");
       if (go) showView(go.dataset.wgo);
     });
@@ -1004,9 +1015,10 @@
     return { id: id, keys: null };
   }
   // 고른 줄이나 문항 꼬리표에 이름이 나오는 사진을 찾는다 ("익산 미륵사지 석탑" → 미륵사지).
-  // 석탑, 3층처럼 여러 사진에 두루 붙는 말로는 찾지 않는다
+  // 석탑, 3층, 백제처럼 여러 사진에 두루 붙는 말로는 찾지 않는다
   var IMG_STOP = {};
-  "석탑 3층 5층 9층 10층 8각 입상 좌상 삼존상 여래 마애 석조 금동 본존불 복원 사진 청사 서명문 태극기 항아리 매병".split(" ")
+  ("석탑 3층 5층 9층 10층 8각 입상 좌상 삼존상 여래 마애 석조 금동 본존불 복원 사진 청사 서명문 태극기 항아리 매병 " +
+    "백제 신라 고구려 발해 가야 고려 조선 통일 대한 제국 한국 대한민국 왕조 정부").split(" ")
     .forEach(function (w) { IMG_STOP[w] = true; });
   function plainName(v) { return v.replace(/[\s·「」()\[\],.]/g, ""); }
   var IMG_KEYS = Object.keys(window.IMAGES || {}).map(function (id) {
@@ -1058,6 +1070,37 @@
       '<span class="mock-wans">' + (q.mine ? "내 답 " + CIRCLED[q.mine - 1] : "무응답") + " → 정답 <b>" + CIRCLED[+q.ex.ans[q.i] - 1] + "</b> · " + q.ex.pts[q.i] + "점</span>" +
       '<button class="mini" data-crop="' + q.ex.round + ":" + q.i + '">문제 보기</button></div>';
   }
+  // 문항 풀이(js/data/exam_notes_*.js): 꼭 알아야 할 것, 왜 그 답인가, 내가 고른 보기, 나머지 보기
+  function examNote(round, i) {
+    var r = (window.EXAM_NOTES || {})[round];
+    return (r && r[i]) || null;
+  }
+  function examNoteHtml(q) {
+    var n = examNote(q.ex.round, q.i);
+    if (!n) return "";
+    var era = tagEra(q.ex.tags[q.i]), seen = {}, right = +q.ex.ans[q.i], rest = "";
+    function tx(v) { return linkTerms(fmt(v), era, seen); }
+    var key = n.k.map(function (v) { return "<li>" + tx(v) + "</li>"; }).join("");
+    var why = "<p>" + tx(n.a) + "</p>", miss = q.mine ? tx(n.x[q.mine - 1]) : "";
+    n.x.forEach(function (v, k) {
+      if (k + 1 !== q.mine) rest += '<li' + (k + 1 === right ? ' class="ok"' : "") + "><b>" + CIRCLED[k] + "</b><span>" + tx(v) + "</span></li>";
+    });
+    return '<div class="wq-note">' +
+      '<div class="wq-sec wq-key"><h4>꼭 알아야 할 것</h4><ul>' + key + "</ul></div>" +
+      '<div class="wq-sec wq-why"><h4>왜 ' + CIRCLED[right - 1] + "번이 정답인가</h4>" + why + "</div>" +
+      (q.mine ? '<div class="wq-sec wq-miss"><h4>내가 고른 ' + CIRCLED[q.mine - 1] + "번은 왜 틀렸나</h4><p>" + miss + "</p></div>" : "") +
+      '<details class="wq-rest"><summary>' + (q.mine ? "나머지 보기 풀이" : "보기별 풀이") + '</summary><ul>' + rest + "</ul></details></div>";
+  }
+  function wrongCardHtml(q) {
+    return '<div class="wq-card">' + wrongRowHtml(q) + examNoteHtml(q) + "</div>";
+  }
+  // 그 주제를 어디까지 펼칠지: 풀이만("key"), 관련 필기 줄("lines"), 주제 전체("full").
+  // 풀이가 아직 없는 문항이 섞여 있으면 필기 줄을 기본으로 보여 준다
+  function wrongShowOf(id, grp) {
+    var noted = grp.qs.every(function (q) { return examNote(q.ex.round, q.i); });
+    var v = wrongShow[id] || (wrongView === "lines" || !noted ? "lines" : "key");
+    return v === "lines" && grp.whole ? "full" : v;
+  }
   function renderWrongConcepts() {
     var M = mockState(), g = wrongGroups();
     var rounds = EXAMS.filter(function (ex) { return (M.hist[ex.round] || []).length; });
@@ -1067,7 +1110,7 @@
     $("#toc-current").textContent = "기출 오답 개념";
     var html = '<h2 class="topic-title range-title">실전 기출에서 틀린 개념</h2>';
     if (!rounds.length) {
-      html += '<p class="range-empty">아직 채점한 실전 기출이 없습니다. 한 회를 풀고 제출하면, 틀린 문제와 이어진 개념만 여기에 모입니다.</p>' +
+      html += '<p class="range-empty">아직 채점한 실전 기출이 없습니다. 한 회를 풀고 제출하면, 틀린 문제마다 꼭 알아야 할 것과 풀이가 여기에 모입니다.</p>' +
         '<button type="button" class="mini" data-wgo="mock">실전 기출 풀러 가기</button>';
     } else {
       if (rounds.length > 1) {
@@ -1078,20 +1121,32 @@
               ex.round + "회 <small>" + h[h.length - 1].score + "점</small></button>";
           }).join("") + "</div>";
       }
-      html += '<p class="range-empty">틀린 문제마다 관련된 줄만 골라 놓았습니다. 줄이 부족해 보이면 "주제 전체 보기"를 누르세요. "문제 보기"는 이 기기에 그 회차 문제지가 있을 때 나옵니다.</p>';
-      if (!nq) html += '<p class="range-empty">틀린 문제가 없습니다.</p>';
+      if (nq) {
+        html += '<div class="range-jump wq-view"><button type="button" class="mini' + (wrongView === "key" ? " active" : "") + '" data-wview="key">필수 개념·풀이만</button>' +
+          '<button type="button" class="mini' + (wrongView === "lines" ? " active" : "") + '" data-wview="lines">필기 줄까지</button></div>' +
+          '<p class="range-empty">틀린 문제마다 꼭 알아야 할 것, 왜 그 답인지, 내가 고른 보기가 왜 틀렸는지를 적어 놓았습니다. "문제 보기"는 이 기기에 그 회차 문제지가 있을 때 나옵니다.</p>';
+      } else html += '<p class="range-empty">틀린 문제가 없습니다.</p>';
       html += g.order.map(function (id, k) {
-        var x = TOPICS[topicIndex(id)], grp = g.by[id], full = grp.whole || wrongFull[id];
+        var x = TOPICS[topicIndex(id)], grp = g.by[id], show = wrongShowOf(id, grp);
+        var tags = grp.qs.map(function (q) { return q.tag[1]; });
         var head = '<div class="range-head"><span class="range-num">' + (k + 1) + "</span>" +
           '<div><div class="range-era">' + esc(x.era.name) + '</div><h3 class="range-topic">' + esc(x.t.title) + masteryBadge(id) + "</h3></div></div>" +
-          '<div class="wq-rows">' + grp.qs.map(wrongRowHtml).join("") + "</div>";
-        return topicHtml(x, head, full ? null : grp.picks,
-          full ? imagesForTags(grp.qs.map(function (q) { return q.tag[1]; })) : wrongPhotos(id, grp)) +
-          (grp.whole ? "" : '<div class="wq-more"><button type="button" class="mini" data-wfull="' + id + '">' + (wrongFull[id] ? "관련 줄만 보기" : "주제 전체 보기") + "</button></div>");
+          '<div class="wq-cards">' + grp.qs.map(wrongCardHtml).join("") + "</div>";
+        function btn(to, label) { return '<button type="button" class="mini" data-wtopic="' + id + '" data-wshow="' + to + '">' + label + "</button>"; }
+        if (show === "key") {
+          var ph = imagesForTags(tags);
+          return '<section class="topic-page" id="topic-' + id + '">' + head +
+            (ph.length ? '<div class="photo-row">' + ph.map(function (im) { return figureHtml(im, true); }).join("") + "</div>" : "") +
+            '<div class="wq-more">' + btn("lines", grp.whole ? "이 주제 필기 보기" : "필기에서 관련 줄 보기") + "</div></section>";
+        }
+        var full = show === "full";
+        return topicHtml(x, head, full ? null : grp.picks, full ? imagesForTags(tags) : wrongPhotos(id, grp)) +
+          '<div class="wq-more">' + (grp.whole ? "" : btn(full ? "lines" : "full", full ? "관련 줄만 보기" : "주제 전체 보기")) +
+          btn("key", "필기 접기") + "</div>";
       }).join("");
       if (g.loose.length) {
         html += '<section class="topic-page"><div class="range-head"><span class="range-num">+</span><div><div class="range-era">여러 시대에 걸친 문제</div>' +
-          '<h3 class="range-topic">한 주제로 묶이지 않는 문항</h3></div></div><div class="wq-rows">' + g.loose.map(wrongRowHtml).join("") + "</div></section>";
+          '<h3 class="range-topic">한 주제로 묶이지 않는 문항</h3></div></div><div class="wq-cards">' + g.loose.map(wrongCardHtml).join("") + "</div></section>";
       }
     }
     var host = $("#concept-list");
@@ -2354,6 +2409,7 @@
         '<span class="mock-wans">' + (ans[i] ? "내 답 " + CIRCLED[ans[i] - 1] : "무응답") +
         " → 정답 <b>" + CIRCLED[+ex.ans[i] - 1] + "</b> · " + ex.pts[i] + "점</span>" +
         '<button class="mini" data-crop="' + round + ":" + i + '">문제 보기</button>' +
+        (examNote(round, i) ? '<button class="mini" data-exnote="' + round + ":" + i + ":" + (ans[i] || 0) + '">풀이</button>' : "") +
         (hasTopic ? '<button class="mini" data-topic="' + tag[0] + '">개념 보기</button>' : "") + "</div>";
     }).join("");
     var hist = mockState().hist[round] || [];
@@ -2378,6 +2434,7 @@
     $("#mock-back").addEventListener("click", renderMockPick);
     bindTopicButtons($("#mock-result"));
     bindCropButtons($("#mock-result"));
+    bindNoteButtons($("#mock-result"));
     window.scrollTo(0, 0);
   }
 
@@ -2401,6 +2458,7 @@
           '<span class="mock-wtag"><span class="q-tag">' + esc(ERA_NAMES[era] || era) + "</span> " + esc(tag[1]) + "</span>" +
           '<span class="mock-wans">' + (ans[i] ? "내 답 " + CIRCLED[ans[i] - 1] : "무응답") + " → 정답 <b>" + CIRCLED[+ex.ans[i] - 1] + "</b></span>" +
           '<button class="mini" data-crop="' + ex.round + ":" + i + '">문제 보기</button>' +
+          (examNote(ex.round, i) ? '<button class="mini" data-exnote="' + ex.round + ":" + i + ":" + (ans[i] || 0) + '">풀이</button>' : "") +
           (TOPIC_ERA[tag[0]] ? '<button class="mini" data-topic="' + tag[0] + '">개념 보기</button>' : "") + "</div>";
       }
       if (rows) out += '<div class="card mock-wrong-card"><h2>실전 기출 제' + ex.round + "회 <small>" + rec.at + " · " + rec.score + "점</small></h2>" + rows + "</div>";
@@ -2435,6 +2493,22 @@
     window.addEventListener("resize", function () {
       clearTimeout(t);
       t = setTimeout(function () { if ($("#qv-canvas") && !$("#mock-run").classList.contains("hidden")) drawQ(); }, 200);
+    });
+  }
+
+  // 결과·오답 노트에서 "풀이": 그 줄 아래(문제 그림이 펼쳐져 있으면 그 아래)에 풀이를 펼친다
+  function bindNoteButtons(root) {
+    $$("button[data-exnote]", root).forEach(function (b) {
+      b.addEventListener("click", function () {
+        var row = b.closest(".mock-wrong"), p = b.dataset.exnote.split(":"), el = row.nextElementSibling;
+        if (el && el.classList.contains("crop-box")) el = el.nextElementSibling;
+        if (el && el.classList.contains("wq-note")) { el.remove(); b.textContent = "풀이"; return; }
+        var box = document.createElement("div");
+        box.innerHTML = examNoteHtml({ ex: examByRound(+p[0]), i: +p[1], mine: +p[2] });
+        var prev = row.nextElementSibling && row.nextElementSibling.classList.contains("crop-box") ? row.nextElementSibling : row;
+        prev.parentNode.insertBefore(box.firstChild, prev.nextSibling);
+        b.textContent = "풀이 접기";
+      });
     });
   }
 
@@ -2479,7 +2553,7 @@
     if (!S.wrong.length) {
       host.innerHTML = mockHtml + '<p class="empty">' + (mockHtml ? "연습 문제 오답은 아직 없습니다." :
         "아직 오답이 없습니다. 문제를 풀면 틀린 문항이 여기 쌓입니다.") + "</p>";
-      bindTopicButtons(host); bindCropButtons(host);
+      bindTopicButtons(host); bindCropButtons(host); bindNoteButtons(host);
       return;
     }
     host.innerHTML = mockHtml + (mockHtml ? '<h2 class="wrong-sub">연습 문제 오답</h2>' : "") + S.wrong.map(function (w) {
@@ -2493,7 +2567,7 @@
         '<div class="wrong-mine">내 답 ' + (w.mine + 1) + "번 · " + esc(q.choices[w.mine]) + "</div>" +
         '<div class="wrong-ex">' + linkTerms(esc(q.explain), q.era, {}) + '<div class="ex-kw" style="margin-top:6px;font-size:12px">핵심어 · ' + esc(q.keyword) + "</div></div></div>";
     }).join("");
-    bindTopicButtons(host); bindCropButtons(host);
+    bindTopicButtons(host); bindCropButtons(host); bindNoteButtons(host);
   }
 
   function initWrong() {
