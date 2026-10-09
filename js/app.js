@@ -920,8 +920,11 @@
     return '<section class="topic-page" id="topic-' + t.id + '">' + heading +
       '<div class="topic-body"><ul class="points">' +
       t.points.map(function (p) { return noteBulletsHtml(p, era.id, seen, t.id); }).join("") + "</ul>" +
-      (IMAGES_BY_TOPIC[t.id] ? '<div class="photo-row">' +
-        IMAGES_BY_TOPIC[t.id].map(function (id) { return figureHtml(id, true); }).join("") + "</div>" : "") +
+      (function () {
+        // 주제 사진에, 틀린 문제에 해당하는 다른 주제의 사진을 앞에 더한다
+        var ids = (photos || []).concat((IMAGES_BY_TOPIC[t.id] || []).filter(function (id) { return (photos || []).indexOf(id) === -1; }));
+        return ids.length ? '<div class="photo-row">' + ids.map(function (id) { return figureHtml(id, true); }).join("") + "</div>" : "";
+      })() +
       '<div class="kw-row">' +
       t.keywords.map(function (k) { return '<span class="kw">' + linkTerms(esc(k), era.id, {}) + "</span>"; }).join("") +
       '</div><div class="tip">' + linkTerms(fmt(t.tip), era.id, seen) + "</div></div></section>";
@@ -1008,23 +1011,26 @@
   function plainName(v) { return v.replace(/[\s·「」()\[\],.]/g, ""); }
   var IMG_KEYS = Object.keys(window.IMAGES || {}).map(function (id) {
     var toks = window.IMAGES[id].name.replace(/[「」()\[\]]/g, " ").split(/\s+/).filter(function (w) { return w && !IMG_STOP[w]; });
-    var long = toks.filter(function (w) { return w.length >= 3; });
-    return { id: id, full: plainName(window.IMAGES[id].name), keys: long.length ? long : toks.slice(-1), last: toks[toks.length - 1] || "" };
+    return { id: id, full: plainName(window.IMAGES[id].name), toks: toks, long: toks.filter(function (w) { return w.length >= 3; }) };
   });
-  // 줄 내용에서 찾기: 사진 이름 전체나 이름 속 긴 낱말이 나오는가
+  // 줄 내용에서 찾기: 사진 이름 전체나 이름 속 긴 낱말이 나오는가.
+  // 짧은 낱말뿐인 이름("종묘 정전")은 낱말이 모두 나와야 한다 ("정전 협정"에 걸리지 않게)
   function imagesFor(text) {
     var t = plainName(text);
     return IMG_KEYS.filter(function (k) {
-      return t.indexOf(k.full) !== -1 || k.keys.some(function (w) { return t.indexOf(w) !== -1; });
+      if (t.indexOf(k.full) !== -1) return true;
+      if (k.long.length) return k.long.some(function (w) { return t.indexOf(w) !== -1; });
+      return k.toks.length > 0 && k.toks.every(function (w) { return t.indexOf(w) !== -1; });
     }).map(function (k) { return k.id; });
   }
-  // 문항 꼬리표에서 찾기: 꼬리표 낱말이 사진 이름에 들어 있어도 맞는 것으로 본다 ("광개토대왕" → 광개토대왕릉비, "금관" → 금관총 금관)
+  // 문항 꼬리표에서 찾기: 꼬리표 낱말이 사진 이름의 낱말과 같거나 이름에 들어 있으면 맞는 것으로 본다
+  // ("종묘" → 종묘 정전, "금관" → 금관총 금관, "광개토대왕" → 광개토대왕릉비)
   function imagesForTags(labels) {
     var t = plainName(labels.join(" ")), toks = [];
     labels.forEach(function (l) { toks = toks.concat(tagTokens(l)); });
     return IMG_KEYS.filter(function (k) {
-      if (t.indexOf(k.full) !== -1 || k.keys.some(function (w) { return t.indexOf(w) !== -1; })) return true;
-      return toks.some(function (w) { return (w.length >= 3 && k.full.indexOf(plainName(w)) !== -1) || w === k.last; });
+      if (t.indexOf(k.full) !== -1 || k.long.some(function (w) { return t.indexOf(w) !== -1; })) return true;
+      return toks.some(function (w) { return k.toks.indexOf(w) !== -1 || (w.length >= 3 && k.full.indexOf(plainName(w)) !== -1); });
     }).map(function (k) { return k.id; });
   }
   // 틀린 문제에 바로 해당하는 사진을 먼저, 그다음 고른 줄에 나오는 사진. 많아야 8장
@@ -1079,7 +1085,8 @@
         var head = '<div class="range-head"><span class="range-num">' + (k + 1) + "</span>" +
           '<div><div class="range-era">' + esc(x.era.name) + '</div><h3 class="range-topic">' + esc(x.t.title) + masteryBadge(id) + "</h3></div></div>" +
           '<div class="wq-rows">' + grp.qs.map(wrongRowHtml).join("") + "</div>";
-        return topicHtml(x, head, full ? null : grp.picks, full ? null : wrongPhotos(id, grp)) +
+        return topicHtml(x, head, full ? null : grp.picks,
+          full ? imagesForTags(grp.qs.map(function (q) { return q.tag[1]; })) : wrongPhotos(id, grp)) +
           (grp.whole ? "" : '<div class="wq-more"><button type="button" class="mini" data-wfull="' + id + '">' + (wrongFull[id] ? "관련 줄만 보기" : "주제 전체 보기") + "</button></div>");
       }).join("");
       if (g.loose.length) {
