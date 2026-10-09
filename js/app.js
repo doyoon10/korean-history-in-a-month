@@ -905,14 +905,17 @@
     return '<span class="m-badge m-' + masteryLevel(m) + '">숙련도 ' + pctOf(m.s) + "%</span>";
   }
   // picks: { "줄 번호:불릿 번호": true } 를 주면 그 불릿만 그리고 사진·키워드·시험 포인트는 뺀다
-  function topicHtml(x, heading, picks) {
+  // photos: 고른 줄에 나오는 문화유산 사진 id (없으면 생략)
+  function topicHtml(x, heading, picks, photos) {
     var t = x.t, era = x.era, seen = {};
     if (picks) {
       return '<section class="topic-page" id="topic-' + t.id + '">' + heading +
         '<div class="topic-body"><ul class="points">' +
         t.points.map(function (p, pi) {
           return noteBulletsHtml(p, era.id, seen, t.id, function (b, bi) { return picks[pi + ":" + bi]; });
-        }).join("") + "</ul></div></section>";
+        }).join("") + "</ul>" +
+        (photos && photos.length ? '<div class="photo-row">' + photos.map(function (id) { return figureHtml(id, true); }).join("") + "</div>" : "") +
+        "</div></section>";
     }
     return '<section class="topic-page" id="topic-' + t.id + '">' + heading +
       '<div class="topic-body"><ul class="points">' +
@@ -997,6 +1000,40 @@
     }
     return { id: id, keys: null };
   }
+  // 고른 줄이나 문항 꼬리표에 이름이 나오는 사진을 찾는다 ("익산 미륵사지 석탑" → 미륵사지).
+  // 석탑, 3층처럼 여러 사진에 두루 붙는 말로는 찾지 않는다
+  var IMG_STOP = {};
+  "석탑 3층 5층 9층 10층 8각 입상 좌상 삼존상 여래 마애 석조 금동 본존불 복원 사진 청사 서명문 태극기 항아리 매병".split(" ")
+    .forEach(function (w) { IMG_STOP[w] = true; });
+  function plainName(v) { return v.replace(/[\s·「」()\[\],.]/g, ""); }
+  var IMG_KEYS = Object.keys(window.IMAGES || {}).map(function (id) {
+    var toks = window.IMAGES[id].name.replace(/[「」()\[\]]/g, " ").split(/\s+/).filter(function (w) { return w && !IMG_STOP[w]; });
+    var long = toks.filter(function (w) { return w.length >= 3; });
+    return { id: id, full: plainName(window.IMAGES[id].name), keys: long.length ? long : toks.slice(-1), last: toks[toks.length - 1] || "" };
+  });
+  // 줄 내용에서 찾기: 사진 이름 전체나 이름 속 긴 낱말이 나오는가
+  function imagesFor(text) {
+    var t = plainName(text);
+    return IMG_KEYS.filter(function (k) {
+      return t.indexOf(k.full) !== -1 || k.keys.some(function (w) { return t.indexOf(w) !== -1; });
+    }).map(function (k) { return k.id; });
+  }
+  // 문항 꼬리표에서 찾기: 꼬리표 낱말이 사진 이름에 들어 있어도 맞는 것으로 본다 ("광개토대왕" → 광개토대왕릉비, "금관" → 금관총 금관)
+  function imagesForTags(labels) {
+    var t = plainName(labels.join(" ")), toks = [];
+    labels.forEach(function (l) { toks = toks.concat(tagTokens(l)); });
+    return IMG_KEYS.filter(function (k) {
+      if (t.indexOf(k.full) !== -1 || k.keys.some(function (w) { return t.indexOf(w) !== -1; })) return true;
+      return toks.some(function (w) { return (w.length >= 3 && k.full.indexOf(plainName(w)) !== -1) || w === k.last; });
+    }).map(function (k) { return k.id; });
+  }
+  // 틀린 문제에 바로 해당하는 사진을 먼저, 그다음 고른 줄에 나오는 사진. 많아야 8장
+  function wrongPhotos(id, grp) {
+    var out = imagesForTags(grp.qs.map(function (q) { return q.tag[1]; })), text = "";
+    topicBullets(id).forEach(function (r) { if (grp.picks[r.key]) text += " " + r.plain; });
+    imagesFor(text).forEach(function (im) { if (out.indexOf(im) === -1) out.push(im); });
+    return out.slice(0, 8);
+  }
   function wrongGroups() {
     var by = {}, loose = [];
     mockWrongItems(wrongRound).forEach(function (q) {
@@ -1042,7 +1079,7 @@
         var head = '<div class="range-head"><span class="range-num">' + (k + 1) + "</span>" +
           '<div><div class="range-era">' + esc(x.era.name) + '</div><h3 class="range-topic">' + esc(x.t.title) + masteryBadge(id) + "</h3></div></div>" +
           '<div class="wq-rows">' + grp.qs.map(wrongRowHtml).join("") + "</div>";
-        return topicHtml(x, head, full ? null : grp.picks) +
+        return topicHtml(x, head, full ? null : grp.picks, full ? null : wrongPhotos(id, grp)) +
           (grp.whole ? "" : '<div class="wq-more"><button type="button" class="mini" data-wfull="' + id + '">' + (wrongFull[id] ? "관련 줄만 보기" : "주제 전체 보기") + "</button></div>");
       }).join("");
       if (g.loose.length) {
