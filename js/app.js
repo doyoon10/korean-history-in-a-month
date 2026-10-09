@@ -247,6 +247,7 @@
     if (name === "wrong") renderWrong();
     if (name === "analysis") renderAnalysis();
     if (name === "quiz") renderAdaptiveCard();
+    if (name === "concept") { if (wrongOn) renderConcept(); else paintModes(); }
     if (name !== "mock") { pauseMock(); return stopMockTimer(); }
     // 푸는 중이면 멈춘 상태 그대로 보여 주고(시작은 직접 누른다), 결과 화면은 그대로 두고, 나머지는 회차 목록을 새로 그린다
     if (!$("#mock-run").classList.contains("hidden") && mockState().cur) {
@@ -754,6 +755,8 @@
     era.topics.forEach(function (t) { TOPICS.push({ t: t, era: era }); });
   });
   var conceptCur = null, rangeDay = null;
+  // 기출 오답 보기: 실전 기출에서 틀린 문항과 이어진 줄만 모아 보여 준다
+  var wrongOn = false, wrongRound = null, wrongFull = {};
 
   function topicIndex(id) {
     for (var i = 0; i < TOPICS.length; i++) if (TOPICS[i].t.id === id) return i;
@@ -773,9 +776,12 @@
     return rangeDay === "today" ? todayPlan() : planByDay(rangeDay);
   }
   function rangeIds() {
+    if (wrongOn) return wrongGroups().order;
     var p = rangePlan();
     return p ? p.concepts.filter(function (id) { return topicIndex(id) >= 0; }) : [];
   }
+  // 한 화면에 여러 주제를 이어 붙여 보는 중인가 (오늘 범위, 기출 오답)
+  function stacked() { return wrongOn || rangeDay != null; }
   function rangeNeighbor(dir) {
     var p = rangePlan();
     return p ? nearDay(dir < 0 ? (p.first || p.day) : (p.last || p.day), dir) : null;
@@ -787,11 +793,13 @@
     var mode = "range";
     try { mode = localStorage.getItem(MODE_KEY) || "range"; } catch (e) {}
     rangeDay = mode === "range" ? "today" : null;
+    wrongOn = mode === "wrong";
 
     $("#concept-modes").addEventListener("click", function (e) {
       var b = e.target.closest("[data-mode]");
       if (!b) return;
       if (b.dataset.mode === "range") showRange("today");
+      else if (b.dataset.mode === "wrong") showWrong(null);
       else pickTopic(conceptCur);
     });
     $("#concept-search").addEventListener("input", renderToc);
@@ -799,12 +807,18 @@
       var b = e.target.closest("[data-topic-id]");
       if (!b) return;
       // 오늘 범위를 보는 중에 범위 안 주제를 누르면 그 자리로 내려가고, 범위 밖이면 그 주제 하나를 연다
-      if (rangeDay != null && rangeIds().indexOf(b.dataset.topicId) !== -1) jumpTo(b.dataset.topicId);
+      if (stacked() && rangeIds().indexOf(b.dataset.topicId) !== -1) jumpTo(b.dataset.topicId);
       else pickTopic(b.dataset.topicId);
     });
     $("#concept-list").addEventListener("click", function (e) {
       var b = e.target.closest("[data-jump-topic]");
-      if (b) jumpTo(b.dataset.jumpTopic);
+      if (b) { jumpTo(b.dataset.jumpTopic); return; }
+      var r = e.target.closest("[data-wround]");
+      if (r) { wrongRound = r.dataset.wround ? +r.dataset.wround : null; renderConcept(); return; }
+      var f = e.target.closest("[data-wfull]");
+      if (f) { wrongFull[f.dataset.wfull] = !wrongFull[f.dataset.wfull]; renderConcept(); jumpTo(f.dataset.wfull); return; }
+      var go = e.target.closest("[data-wgo]");
+      if (go) showView(go.dataset.wgo);
     });
     $("#concept-nav").addEventListener("click", function (e) {
       var b = e.target.closest("[data-go], [data-go-day]");
@@ -825,6 +839,7 @@
       if (e.target && e.target.closest && e.target.closest("input, textarea, select")) return;
       if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
       var dir = e.key === "ArrowRight" ? 1 : -1;
+      if (wrongOn) return;
       if (rangeDay != null) {
         var d = rangeNeighbor(dir);
         if (d) showRange(d.day);
@@ -868,7 +883,7 @@
         html += '<div class="toc-era"><div class="toc-era-name">' + esc(x.era.name) + "<small>약 " + x.era.ratio + "문항</small></div>";
       }
       var id = x.t.id;
-      var cls = rangeDay != null ? (inRange.indexOf(id) !== -1 ? " in" : "") : (id === conceptCur ? " on" : "");
+      var cls = stacked() ? (inRange.indexOf(id) !== -1 ? " in" : "") : (id === conceptCur ? " on" : "");
       var lv = masteryLevel(masteryOf(id));
       html += '<button type="button" class="toc-item' + cls +
         (today.indexOf(id) !== -1 ? " focus" : "") + '" data-topic-id="' + id + '">' +
@@ -889,8 +904,16 @@
     if (!m) return "";
     return '<span class="m-badge m-' + masteryLevel(m) + '">숙련도 ' + pctOf(m.s) + "%</span>";
   }
-  function topicHtml(x, heading) {
+  // picks: { "줄 번호:불릿 번호": true } 를 주면 그 불릿만 그리고 사진·키워드·시험 포인트는 뺀다
+  function topicHtml(x, heading, picks) {
     var t = x.t, era = x.era, seen = {};
+    if (picks) {
+      return '<section class="topic-page" id="topic-' + t.id + '">' + heading +
+        '<div class="topic-body"><ul class="points">' +
+        t.points.map(function (p, pi) {
+          return noteBulletsHtml(p, era.id, seen, t.id, function (b, bi) { return picks[pi + ":" + bi]; });
+        }).join("") + "</ul></div></section>";
+    }
     return '<section class="topic-page" id="topic-' + t.id + '">' + heading +
       '<div class="topic-body"><ul class="points">' +
       t.points.map(function (p) { return noteBulletsHtml(p, era.id, seen, t.id); }).join("") + "</ul>" +
@@ -903,13 +926,149 @@
 
   function paintModes() {
     $("#mode-range-day").textContent = "DAY " + todayPlan().day;
-    $$("#concept-modes [data-mode]").forEach(function (b) {
-      b.classList.toggle("active", (b.dataset.mode === "range") === (rangeDay != null));
+    var n = mockWrongItems(null).length;
+    $("#mode-wrong-n").textContent = n ? n + "문항" : "";
+    var cur = wrongOn ? "wrong" : rangeDay != null ? "range" : "all";
+    $$("#concept-modes [data-mode]").forEach(function (b) { b.classList.toggle("active", b.dataset.mode === cur); });
+  }
+
+  // ----- 기출 오답: 틀린 문항 → 주제 → 그 문항과 이어진 줄 -----
+  // 회차마다 가장 최근 응시에서 틀린 문항
+  function mockWrongItems(round) {
+    var M = mockState(), out = [];
+    EXAMS.forEach(function (ex) {
+      if (round && ex.round !== round) return;
+      var hist = M.hist[ex.round];
+      if (!hist || !hist.length) return;
+      var ans = hist[hist.length - 1].ans.split("").map(Number);
+      for (var i = 0; i < 50; i++) if (ans[i] !== +ex.ans[i]) out.push({ ex: ex, i: i, mine: ans[i], tag: ex.tags[i] });
     });
+    return out;
+  }
+  // 문항 꼬리표("백제 웅진 시기(삼근왕)")에서 줄을 찾을 낱말만 남긴다. 어디에나 나오는 말은 뺀다
+  var TAG_STOP = {};
+  ("시기 사이 연표 이후 이전 시대 정부 사건 정책 문화 운동 인물 지역 활동 순서 과정 관련 역대 제도 모습 전개 배경 결과 영향 설명 " +
+    "조선 고려 후기 전기 초기 말기 경제 사회 문화유산 일제 강점기 개화기 근현대 주요 대응 변천 성장 의식 대한 지역사 통치 체제 대외 관계 교류").split(" ")
+    .forEach(function (w) { TAG_STOP[w] = true; });
+  function tagTokens(label) {
+    return label.replace(/[()~,\/]/g, " ").replace(/([가-힣])·(?=[가-힣])/g, "$1 ").split(/\s+/)
+      .map(function (w) { return w.replace(/[^가-힣A-Za-z0-9·]/g, ""); })
+      .filter(function (w) { return w.length >= 2 && !TAG_STOP[w]; });
+  }
+  function bulletPlain(b) {
+    return (b.subject + " " + b.lines.join(" ") + " " + b.notes.concat(b.subjectNotes).map(function (n) { return n.text; }).join(" "))
+      .replace(/\*\*/g, "").replace(/\s+/g, "");
+  }
+  var bulletCache = {};
+  function topicBullets(id) {
+    if (bulletCache[id]) return bulletCache[id];
+    var out = [], t = TOPICS[topicIndex(id)].t;
+    t.points.forEach(function (p, pi) {
+      window.parseNote(p).forEach(function (b, bi) { out.push({ key: pi + ":" + bi, plain: bulletPlain(b) }); });
+    });
+    return (bulletCache[id] = out);
+  }
+  // 낱말이 겹치는 줄을 찾는다. 가장 많이 겹친 줄의 6할 이상만, 많아야 5줄
+  function matchLines(id, toks) {
+    var rows = topicBullets(id).map(function (r) {
+      var sc = 0;
+      toks.forEach(function (w) { if (r.plain.indexOf(w) !== -1) sc += w.length; });
+      return { key: r.key, sc: sc };
+    });
+    var best = rows.reduce(function (m, r) { return Math.max(m, r.sc); }, 0);
+    if (!best) return { best: 0, keys: [] };
+    return { best: best, keys: rows.filter(function (r) { return r.sc >= best * 0.6; })
+      .sort(function (a, b) { return b.sc - a.sc; }).slice(0, 5).map(function (r) { return r.key; }) };
+  }
+  // 꼬리표에 적힌 주제에서 먼저 찾고, 없으면 같은 시대의 다른 주제, 그래도 없으면 주제 전체를 보여 준다
+  function linesForTag(tag) {
+    var id = tag[0], toks = tagTokens(tag[1]);
+    if (topicIndex(id) < 0) return null;
+    var m = toks.length ? matchLines(id, toks) : { best: 0, keys: [] };
+    if (m.best) return { id: id, keys: m.keys };
+    if (toks.length) {
+      var era = TOPIC_ERA[id], alt = null;
+      TOPICS.forEach(function (x) {
+        if (x.era.id !== era || x.t.id === id) return;
+        var r = matchLines(x.t.id, toks);
+        if (r.best >= 3 && (!alt || r.best > alt.best)) alt = { id: x.t.id, keys: r.keys, best: r.best };
+      });
+      if (alt) return { id: alt.id, keys: alt.keys };
+    }
+    return { id: id, keys: null };
+  }
+  function wrongGroups() {
+    var by = {}, loose = [];
+    mockWrongItems(wrongRound).forEach(function (q) {
+      var r = linesForTag(q.tag);
+      if (!r) { loose.push(q); return; }
+      var g = by[r.id] || (by[r.id] = { qs: [], picks: {}, whole: false });
+      g.qs.push(q);
+      if (r.keys) r.keys.forEach(function (k) { g.picks[k] = true; }); else g.whole = true;
+    });
+    var order = TOPICS.map(function (x) { return x.t.id; }).filter(function (id) { return by[id]; });
+    return { by: by, order: order, loose: loose };
+  }
+  function wrongRowHtml(q) {
+    return '<div class="mock-wrong"><span class="mock-wq">' + q.ex.round + "회 " + (q.i + 1) + "번</span>" +
+      '<span class="mock-wtag">' + esc(q.tag[1]) + "</span>" +
+      '<span class="mock-wans">' + (q.mine ? "내 답 " + CIRCLED[q.mine - 1] : "무응답") + " → 정답 <b>" + CIRCLED[+q.ex.ans[q.i] - 1] + "</b> · " + q.ex.pts[q.i] + "점</span>" +
+      '<button class="mini" data-crop="' + q.ex.round + ":" + q.i + '">문제 보기</button></div>';
+  }
+  function renderWrongConcepts() {
+    var M = mockState(), g = wrongGroups();
+    var rounds = EXAMS.filter(function (ex) { return (M.hist[ex.round] || []).length; });
+    var nq = g.loose.length;
+    g.order.forEach(function (id) { nq += g.by[id].qs.length; });
+    $("#concept-crumb").innerHTML = "기출 오답" + " <span>" + (nq ? nq + "문항 · " + g.order.length + "개 주제" : "") + "</span>";
+    $("#toc-current").textContent = "기출 오답 개념";
+    var html = '<h2 class="topic-title range-title">실전 기출에서 틀린 개념</h2>';
+    if (!rounds.length) {
+      html += '<p class="range-empty">아직 채점한 실전 기출이 없습니다. 한 회를 풀고 제출하면, 틀린 문제와 이어진 개념만 여기에 모입니다.</p>' +
+        '<button type="button" class="mini" data-wgo="mock">실전 기출 풀러 가기</button>';
+    } else {
+      if (rounds.length > 1) {
+        html += '<div class="range-jump"><button type="button" class="mini' + (wrongRound ? "" : " active") + '" data-wround="">전체</button>' +
+          rounds.map(function (ex) {
+            var h = M.hist[ex.round];
+            return '<button type="button" class="mini' + (wrongRound === ex.round ? " active" : "") + '" data-wround="' + ex.round + '">' +
+              ex.round + "회 <small>" + h[h.length - 1].score + "점</small></button>";
+          }).join("") + "</div>";
+      }
+      html += '<p class="range-empty">틀린 문제마다 관련된 줄만 골라 놓았습니다. 줄이 부족해 보이면 "주제 전체 보기"를 누르세요. "문제 보기"는 이 기기에 그 회차 문제지가 있을 때 나옵니다.</p>';
+      if (!nq) html += '<p class="range-empty">틀린 문제가 없습니다.</p>';
+      html += g.order.map(function (id, k) {
+        var x = TOPICS[topicIndex(id)], grp = g.by[id], full = grp.whole || wrongFull[id];
+        var head = '<div class="range-head"><span class="range-num">' + (k + 1) + "</span>" +
+          '<div><div class="range-era">' + esc(x.era.name) + '</div><h3 class="range-topic">' + esc(x.t.title) + masteryBadge(id) + "</h3></div></div>" +
+          '<div class="wq-rows">' + grp.qs.map(wrongRowHtml).join("") + "</div>";
+        return topicHtml(x, head, full ? null : grp.picks) +
+          (grp.whole ? "" : '<div class="wq-more"><button type="button" class="mini" data-wfull="' + id + '">' + (wrongFull[id] ? "관련 줄만 보기" : "주제 전체 보기") + "</button></div>");
+      }).join("");
+      if (g.loose.length) {
+        html += '<section class="topic-page"><div class="range-head"><span class="range-num">+</span><div><div class="range-era">여러 시대에 걸친 문제</div>' +
+          '<h3 class="range-topic">한 주제로 묶이지 않는 문항</h3></div></div><div class="wq-rows">' + g.loose.map(wrongRowHtml).join("") + "</div></section>";
+      }
+    }
+    var host = $("#concept-list");
+    host.innerHTML = html;
+    $("#concept-nav").innerHTML = "";
+    bindCropButtons(host);
+    renderToc();
+  }
+  function showWrong(round) {
+    wrongOn = true;
+    wrongRound = round || null;
+    rangeDay = null;
+    setMode("wrong");
+    setTocOpen(false);
+    renderConcept();
+    scrollToReader();
   }
 
   function renderConcept() {
     paintModes();
+    if (wrongOn) return renderWrongConcepts();
     if (rangeDay != null) return renderRange();
     var i = topicIndex(conceptCur);
     if (i < 0) return;
@@ -962,6 +1121,7 @@
   }
   function showRange(day) {
     if (day !== "today" && !planByDay(day)) return;
+    wrongOn = false;
     rangeDay = day;
     setMode("range");
     setTocOpen(false);
@@ -972,6 +1132,7 @@
     if (topicIndex(id) < 0) return;
     conceptCur = id;
     rangeDay = null;
+    wrongOn = false;
     setMode("all");
     try { localStorage.setItem(CONCEPT_KEY, id); } catch (e) {}
     setTocOpen(false);
@@ -1050,7 +1211,7 @@
     return out.filter(function (r) { if (r.s < last) return false; last = r.e; return true; });
   }
 
-  function noteBulletsHtml(raw, era, seen, topicId) {
+  function noteBulletsHtml(raw, era, seen, topicId, pick) {
     // 괄호에서 온 풀이: 라벨에 든 용어의 쉬운 뜻 + 괄호 속 내용(참고)
     // pos: 원래 괄호가 있던 자리 (굵게 표시를 뺀 글자 위치)
     function parenNote(n, at, pos) {
@@ -1081,7 +1242,7 @@
         '<span class="nt-detail">' + (n.detail || "") + "</span></span></span>";
     }
 
-    return window.parseNote(raw).map(function (b) {
+    return window.parseNote(raw).filter(function (b, bi) { return !pick || pick(b, bi); }).map(function (b) {
       var subjPlain = window.noteStripStars(b.subject);
       var subjNotes = b.subjectNotes.map(function (n) {
         return parenNote(n, -1, b.subject.slice(0, n.at).replace(/\*\*/g, "").length);
@@ -2161,12 +2322,15 @@
       Math.floor(rec.secs / 60) + "분 " + (rec.secs % 60) + "초" + (over ? ' <span class="over">(80분 초과)</span>' : "") + "</div></div>" +
       (hist.length > 1 ? '<div class="mock-hist">이 회차 기록 · ' + hist.map(function (h) { return h.score + "점"; }).join(" → ") + "</div>" : "") +
       '<div class="btn-group" style="margin-top:14px"><button class="mini active" id="mock-again">다시 풀기</button>' +
+      (wrong.length ? '<button class="mini adapt-btn" id="mock-concepts">틀린 개념만 모아 보기</button>' : "") +
       '<button class="mini" id="mock-back">회차 목록</button></div></div>' +
       '<div class="card"><h2>시대별 점수</h2>' + eraRows + "</div>" +
       '<div class="card"><h2>틀린 문제 <small>' + wrong.length + "문항</small></h2>" +
       (wrong.length ? '<p class="mock-note">문제지에서 번호를 찾아 다시 보고, 헷갈린 개념은 "개념 보기"로 바로 확인하세요. 오답 노트 탭에도 모아 둡니다.</p>' + wrongRows
         : '<p class="empty">다 맞혔습니다!</p>') + "</div>";
     $("#mock-again").addEventListener("click", function () { startMock(round, true); });
+    var mc = $("#mock-concepts");
+    if (mc) mc.addEventListener("click", function () { showView("concept"); showWrong(round); });
     $("#mock-back").addEventListener("click", renderMockPick);
     bindTopicButtons($("#mock-result"));
     bindCropButtons($("#mock-result"));

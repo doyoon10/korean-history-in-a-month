@@ -701,6 +701,16 @@ html.theme-vt::view-transition-new(root){animation-name:theme-fade-in}
 .range-topic{margin:0;font-size:18.5px;letter-spacing:-.4px;line-height:1.4}
 .topic-page .range-head+.topic-body ul{margin-top:12px}
 .topic-page+.topic-page .range-head{margin-top:0}
+.concept-modes{flex-wrap:wrap}
+.wq-rows{margin:10px 0 2px;padding:2px 12px;border-radius:10px;background:var(--surface-2);border:1px solid var(--line)}
+.wq-rows .mock-wq{width:auto;min-width:74px;color:var(--accent)}
+.wq-rows .mock-wrong{font-size:13px;padding:7px 0}
+.wq-rows .crop-box{margin:4px 0 10px}
+.wq-more{margin:2px 0 0}
+.wq-more .mini{padding:4px 11px;font-size:12px}
+.range-jump .mini.active{color:#fff}
+.range-jump .mini.active small{opacity:.85}
+.concept-nav:empty{display:none}
 .concept-nav{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:24px;padding-top:18px;border-top:1px solid var(--line)}
 .concept-nav button{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:10px 14px;text-align:left;font-size:14px;font-weight:600;color:var(--ink);line-height:1.4}
 .concept-nav button:hover{border-color:var(--accent)}
