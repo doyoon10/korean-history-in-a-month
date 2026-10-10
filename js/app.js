@@ -220,6 +220,53 @@
     $("#stat-solved").textContent = Object.keys(S.seen).length + "문항";
   }
 
+  // ---------- 알림·확인 창 ----------
+  // 브라우저 기본 창(alert, confirm) 대신 화면 가운데에 띄운다. 글의 첫 줄이 제목, 줄바꿈(\n) 뒤가 설명이다.
+  // ask(글, 확인하면 할 일, { yes: 확인 버튼 글자, danger: 지우는 동작이면 true }) / notice(글): 확인 버튼만
+  var dlgBack = null;   // 창을 닫으면 초점을 돌려줄 곳
+  function closeDialog() {
+    var w = $(".dlg-back");
+    if (!w) return;
+    w.remove();
+    if (dlgBack && document.body.contains(dlgBack)) dlgBack.focus();
+    dlgBack = null;
+  }
+  function openDialog(msg, yes, no, danger, onYes) {
+    closeDialog();
+    var parts = String(msg).split("\n"), w = document.createElement("div");
+    w.className = "dlg-back";
+    w.innerHTML = '<div class="dlg" role="alertdialog" aria-modal="true" aria-labelledby="dlg-title"' +
+      (parts.length > 1 ? ' aria-describedby="dlg-desc"' : "") + '><h2 id="dlg-title">' + esc(parts[0]) + "</h2>" +
+      (parts.length > 1 ? '<p id="dlg-desc">' + parts.slice(1).map(esc).join("<br>") + "</p>" : "") +
+      '<div class="dlg-btns">' + (no ? '<button type="button" class="mini" data-dlg="no">' + no + "</button>" : "") +
+      '<button type="button" class="mini ' + (danger ? "dlg-danger" : "active") + '" data-dlg="yes">' + yes + "</button></div></div>";
+    function done(ok) { closeDialog(); if (ok && onYes) onYes(); }
+    w.addEventListener("click", function (e) {
+      var b = e.target.closest("[data-dlg]");
+      if (b) done(b.dataset.dlg === "yes");
+      else if (e.target === w) done(false);   // 창 바깥을 누르면 취소
+    });
+    w.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") { e.preventDefault(); done(false); }
+      else if (e.key === "Tab") {   // 초점이 창 밖으로 나가지 않게 버튼 사이만 돈다
+        var bs = $$("button", w), i = bs.indexOf(document.activeElement);
+        e.preventDefault();
+        bs[(i + (e.shiftKey ? bs.length - 1 : 1)) % bs.length].focus();
+      }
+    });
+    // 창이 떠 있는 동안 뒤 화면이 굴러가지 않게 한다
+    ["wheel", "touchmove"].forEach(function (ev) { w.addEventListener(ev, function (e) { e.preventDefault(); }, { passive: false }); });
+    dlgBack = document.activeElement;
+    document.body.appendChild(w);
+    // 지우는 동작은 실수로 Enter를 눌러도 넘어가지 않게 취소에 초점을 둔다
+    $(danger && no ? '[data-dlg="no"]' : '[data-dlg="yes"]', w).focus();
+  }
+  function ask(msg, onYes, opts) {
+    opts = opts || {};
+    openDialog(msg, opts.yes || "확인", "취소", !!opts.danger, onYes);
+  }
+  function notice(msg) { openDialog(msg, "확인", "", false, null); }
+
   // ---------- 탭 ----------
   // 휴대폰에서는 머리줄이 화면 위에 붙어 있어 그만큼 비켜 둔다. 넓은 화면은 메뉴가 왼쪽이라 0
   function topbarH() {
@@ -772,9 +819,10 @@
     $$("[data-reset]", box).forEach(function (b) {
       b.addEventListener("click", function () {
         var era = b.dataset.reset;
-        if (!confirm(ERA_NAMES[era] + " 기록을 지울까요?\n정답률, 푼 문항, 이 시대의 오답 노트가 함께 지워집니다.")) return;
-        resetEra(era);
-        renderDash(); renderWrong();
+        ask(ERA_NAMES[era] + " 기록을 지울까요?\n정답률, 푼 문항, 이 시대의 오답 노트가 함께 지워집니다.", function () {
+          resetEra(era);
+          renderDash(); renderWrong();
+        }, { yes: "지우기", danger: true });
       });
     });
   }
@@ -792,10 +840,11 @@
 
   function initReset() {
     $("#acc-reset-all").addEventListener("click", function () {
-      if (!confirm("모든 학습 기록을 지울까요?\n플랜 체크, 정답률, 오답 노트가 전부 사라집니다.")) return;
-      S = { done: {}, stats: {}, wrong: [], seen: {}, course: S.course, mastery: {}, review: {}, adaptV: 1 };
-      save();
-      renderDash(); renderPlan(); renderWrong();
+      ask("모든 학습 기록을 지울까요?\n플랜 체크, 정답률, 오답 노트가 전부 사라집니다.", function () {
+        S = { done: {}, stats: {}, wrong: [], seen: {}, course: S.course, mastery: {}, review: {}, adaptV: 1 };
+        save();
+        renderDash(); renderPlan(); renderWrong();
+      }, { yes: "모두 지우기", danger: true });
     });
   }
 
@@ -1027,7 +1076,7 @@
     $("#toc-show").addEventListener("click", function () { setTocHidden(false); renderToc(); });
     // 키보드 ← → : 오늘 범위에서는 앞뒤 날, 전체 주제에서는 앞뒤 주제
     document.addEventListener("keydown", function (e) {
-      if (!$("#view-concept").classList.contains("active") || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (!$("#view-concept").classList.contains("active") || $(".dlg-back") || e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.target && e.target.closest && e.target.closest("input, textarea, select")) return;
       if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
       var dir = e.key === "ArrowRight" ? 1 : -1;
@@ -1877,7 +1926,7 @@
 
   function startQuizFor(filter, n, mode, preset) {
     var list = preset || pickQuestions(filter, n);
-    if (!list.length) { alert("해당 범위의 문제가 없습니다."); return; }
+    if (!list.length) { notice("해당 범위의 문제가 없습니다."); return; }
     run = { list: list, i: 0, answers: [], mode: mode || "study", filter: filter, n: n,
       status: list.map(questionStatus), fb: [] };
     showView("quiz");
@@ -2270,8 +2319,9 @@
           var h = mockState().hist[r];
           return renderMockResult(r, h[h.length - 1]);
         }
-        if (M.cur && M.cur.round === r && M.cur.ans.some(function (a) { return a; }) &&
-            !confirm("찍어 둔 답을 지우고 처음부터 풀까요?")) return;
+        if (M.cur && M.cur.round === r && M.cur.ans.some(function (a) { return a; })) {
+          return ask("찍어 둔 답을 지우고 처음부터 풀까요?", function () { startMock(r, true); }, { yes: "처음부터", danger: true });
+        }
         startMock(r, true);
       });
     });
@@ -2324,8 +2374,7 @@
     $("#mock-go").addEventListener("click", function () { setMockRunning(!mockState().cur.runSince); });
     $("#mock-submit").addEventListener("click", function () {
       var blank = cur.ans.filter(function (a) { return !a; }).length;
-      if (!confirm(blank ? "아직 " + blank + "문항에 답이 없습니다. 이대로 제출할까요?" : "제출하고 채점할까요?")) return;
-      submitMock();
+      ask(blank ? "아직 " + blank + "문항에 답이 없습니다.\n이대로 제출하고 채점할까요?" : "제출하고 채점할까요?", submitMock, { yes: "제출" });
     });
 
     paintMockCount();
@@ -2483,12 +2532,15 @@
       var f = input.files && input.files[0];
       if (!f) return;
       var m = f.name.match(/(\d{2,3})\s*회/) || f.name.match(/^(\d{2,3})[_\s-]/);
-      if (m && +m[1] !== round && !confirm("파일 이름으로는 제" + m[1] + "회 같습니다. 제" + round + "회 문제지로 쓸까요?")) return;
-      var pdf = f.type === "application/pdf" ? f : new Blob([f], { type: "application/pdf" });
-      pdfPut(round, pdf, function (ok) {
-        // 저장이 막힌 브라우저(사생활 보호 모드 등)에서는 이번에만 연다
-        if (ok) loadMockPaper(round); else showPaper(host, round, pdf);
-      });
+      function use() {
+        var pdf = f.type === "application/pdf" ? f : new Blob([f], { type: "application/pdf" });
+        pdfPut(round, pdf, function (ok) {
+          // 저장이 막힌 브라우저(사생활 보호 모드 등)에서는 이번에만 연다
+          if (ok) loadMockPaper(round); else showPaper(host, round, pdf);
+        });
+      }
+      if (m && +m[1] !== round) ask("파일 이름으로는 제" + m[1] + "회 같습니다.\n제" + round + "회 문제지로 쓸까요?", use, { yes: "그대로 쓰기" });
+      else use();
     });
   }
   function showPaper(host, round, blob, forceFull, note) {
@@ -2687,7 +2739,7 @@
     });
     // 키보드: ←/→ 이전·다음 문제, 1~5 답 고르기
     document.addEventListener("keydown", function (e) {
-      if (!$("#view-mock").classList.contains("active") || $("#mock-run").classList.contains("hidden")) return;
+      if (!$("#view-mock").classList.contains("active") || $("#mock-run").classList.contains("hidden") || $(".dlg-back")) return;
       var cur = mockState().cur;
       if (!cur || !cur.runSince || e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.target && e.target.closest && e.target.closest("input, textarea, select")) return;
@@ -2851,16 +2903,18 @@
     // 묶음 비우기: 기출은 지운 것으로 표시만 해서 되돌릴 수 있고, 연습 문제는 오답 기록을 실제로 지운다
     $$("[data-wl-clear]", root).forEach(function (b) {
       b.addEventListener("click", function () {
+        function done() { save(); renderWrong(); paintModes(); }
         if (b.dataset.wlClear === "practice") {
-          if (!confirm("연습 문제 오답 " + S.wrong.length + "문항을 모두 비울까요?\n실전 기출 오답은 그대로 남습니다.")) return;
-          S.wrong = [];
-        } else {
-          var keys = mockWrongItems(null).map(function (q) { return q.ex.round + ":" + q.i; });
-          if (!confirm("실전 기출 오답 " + keys.length + "문항을 모두 지울까요?\n점수 기록과 연습 문제 오답은 그대로 남고, '되돌리기'로 다시 볼 수 있습니다.")) return;
-          keys.forEach(function (k) { mockMark("mockHide")[k] = true; });
+          return ask("연습 문제 오답 " + S.wrong.length + "문항을 모두 비울까요?\n실전 기출 오답은 그대로 남습니다. 비운 뒤에는 되돌릴 수 없습니다.", function () {
+            S.wrong = [];
+            done();
+          }, { yes: "비우기", danger: true });
         }
-        save();
-        renderWrong(); paintModes();
+        var keys = mockWrongItems(null).map(function (q) { return q.ex.round + ":" + q.i; });
+        ask("실전 기출 오답 " + keys.length + "문항을 모두 지울까요?\n점수 기록과 연습 문제 오답은 그대로 남고, '되돌리기'로 다시 볼 수 있습니다.", function () {
+          keys.forEach(function (k) { mockMark("mockHide")[k] = true; });
+          done();
+        }, { yes: "비우기", danger: true });
       });
     });
   }
@@ -2981,7 +3035,7 @@
   function initWrong() {
     $("#wrong-retry").addEventListener("click", function () {
       var list = S.wrong.map(function (w) { return qById(w.id); }).filter(Boolean);
-      if (!list.length) { alert("오답 노트가 비어 있습니다."); return; }
+      if (!list.length) { notice("연습 문제 오답이 비어 있습니다."); return; }
       list = shuffle(list);
       run = { list: list, i: 0, answers: [], mode: "study", retryWrong: true, n: 0,
         status: list.map(function () { return "wrong"; }) };

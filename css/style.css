@@ -734,6 +734,18 @@ html.theme-vt::view-transition-new(root){animation-name:theme-fade-in}
 .wq-key li::before{content:"";position:absolute;left:1px;top:.7em;width:5px;height:5px;border-radius:50%;background:var(--hl-ink)}
 .wq-key li+li{margin-top:4px}
 @media (max-width:480px){.wq-card{padding:2px 12px 13px}.wq-opt{gap:8px;padding:8px 10px}.wq-opt.no .wq-badge,.wq-opt.ok .wq-badge{min-width:52px;padding:0 7px}}
+.dlg-back{position:fixed;inset:0;z-index:2000;display:grid;place-items:center;padding:20px;background:rgba(15,16,18,.48);animation:dlg-fade .14s ease-out}
+.dlg{width:min(380px,100%);padding:22px 22px 18px;border-radius:16px;background:var(--card);border:1px solid var(--line);box-shadow:0 14px 44px rgba(0,0,0,.24);animation:dlg-pop .16s ease-out}
+.dlg h2{margin:0;font-size:16.5px;line-height:1.45;letter-spacing:-.3px}
+.dlg p{margin:8px 0 0;font-size:13.5px;line-height:1.65;color:var(--ink-soft)}
+.dlg-btns{display:flex;justify-content:flex-end;gap:8px;margin-top:20px}
+.dlg-btns .mini{min-width:78px;padding:9px 18px;font-size:14px;font-weight:600}
+.dlg-btns .dlg-danger{background:var(--bad);border-color:var(--bad);color:var(--card)}
+.dlg-btns .mini:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@keyframes dlg-fade{from{opacity:0}}
+@keyframes dlg-pop{from{opacity:0;transform:translateY(8px) scale(.97)}}
+@media (prefers-reduced-motion:reduce){.dlg-back,.dlg{animation:none}}
+@media (max-width:480px){.dlg-btns .mini{flex:1}}
 .wq-view{margin-top:10px}
 .wq-view .wq-open{margin-left:auto}
 .exp-note{margin:8px 0 0}
