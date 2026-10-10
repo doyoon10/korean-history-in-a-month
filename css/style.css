@@ -750,6 +750,13 @@ html.theme-vt::view-transition-new(root){animation-name:theme-fade-in}
 .wl-row+.crop-box{margin-top:8px}
 .wl-hid{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:10px 0 0;padding-top:10px;border-top:1px solid var(--line);font-size:12.5px;color:var(--ink-soft)}
 .wl-hid .mini{padding:3px 10px;font-size:12px}
+.wrong-sec{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:24px 0 12px}
+.wrong-sec:first-child{margin-top:0}
+.wrong-sec .wrong-sub{margin:0}
+.wrong-sec .wrong-sub small{margin-left:4px;font-size:12px;font-weight:500;color:var(--ink-soft)}
+.wrong-sec .mini{padding:4px 11px;font-size:12px}
+.wl-cleared{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:0 2px 4px;font-size:12.5px;color:var(--ink-soft)}
+.wl-cleared .mini{padding:3px 10px;font-size:12px}
 .wi-head{display:flex;align-items:center;gap:10px;margin-bottom:12px}
 .wi-head .q-meta{flex:1;margin:0}
 .wi-head .plan-check{margin-top:0}

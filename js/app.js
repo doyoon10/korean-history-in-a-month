@@ -2641,9 +2641,15 @@
     });
   }
 
-  // 오답 노트에 붙일 실전 기출 오답 (회차마다 가장 최근 응시 기준)
+  // 오답 노트의 묶음 머리: 제목, 문항 수, 그 묶음만 비우는 버튼 (기출과 연습 문제를 따로 비운다)
+  function wrongSecHtml(title, n, kind, label) {
+    return '<div class="wrong-sec"><h2 class="wrong-sub">' + title + " <small>" + n + "문항</small></h2>" +
+      (n ? '<button class="mini danger" type="button" data-wl-clear="' + kind + '">' + label + "</button>" : "") + "</div>";
+  }
+  // 오답 노트에 붙일 실전 기출 오답 (회차마다 가장 최근 응시 기준).
+  // 문항을 다 지운 회차는 카드를 그리지 않고 맨 아래 한 줄로 모아 되돌릴 수 있게 한다
   function mockWrongHtml() {
-    var M = mockState(), out = "";
+    var M = mockState(), cards = "", n = 0, cleared = [];
     EXAMS.forEach(function (ex) {
       var hist = M.hist[ex.round];
       if (!hist || !hist.length) return;
@@ -2652,12 +2658,18 @@
         if (ans[i] === +ex.ans[i]) continue;
         if (mockHidden(ex.round + ":" + i)) { hid++; continue; }
         rows += mockRowHtml(ex, i, ans[i], { check: true });
+        n++;
       }
-      if (rows || hid) out += '<div class="card mock-wrong-card">' +
+      if (!rows) { if (hid) cleared.push(ex.round); return; }
+      cards += '<div class="card mock-wrong-card">' +
         expandHeadHtml("실전 기출 제" + ex.round + "회 <small>" + rec.at + " · " + rec.score + "점</small>", "tab:" + ex.round) + rows +
-        (hid ? '<p class="wl-hid">' + (rows ? "" : "남은 문항이 없습니다. ") + "지운 문항 " + hid + '개 <button class="mini" type="button" data-wl-restore="' + ex.round + '">되돌리기</button></p>' : "") + "</div>";
+        (hid ? '<p class="wl-hid">지운 문항 ' + hid + '개 <button class="mini" type="button" data-wl-restore="' + ex.round + '">되돌리기</button></p>' : "") + "</div>";
     });
-    return out;
+    if (!cards && !cleared.length) return "";
+    return wrongSecHtml("실전 기출 오답", n, "mock", "기출 오답 비우기") + cards +
+      (cleared.length ? '<p class="wl-cleared">' + (cards ? "" : "기출 오답을 모두 지웠습니다. ") + "다 지운 회차 " +
+        cleared.map(function (r) { return r + "회"; }).join(", ") +
+        ' <button class="mini" type="button" data-wl-restore="' + cleared.join(",") + '">되돌리기</button></p>' : "");
   }
 
   function initMock() {
@@ -2828,8 +2840,25 @@
     });
     $$("[data-wl-restore]", root).forEach(function (b) {
       b.addEventListener("click", function () {
-        var pre = b.dataset.wlRestore + ":";
-        Object.keys(S.mockHide || {}).forEach(function (k) { if (k.indexOf(pre) === 0) delete S.mockHide[k]; });
+        var pres = b.dataset.wlRestore.split(",").map(function (r) { return r + ":"; });
+        Object.keys(S.mockHide || {}).forEach(function (k) {
+          if (pres.some(function (pre) { return k.indexOf(pre) === 0; })) delete S.mockHide[k];
+        });
+        save();
+        renderWrong(); paintModes();
+      });
+    });
+    // 묶음 비우기: 기출은 지운 것으로 표시만 해서 되돌릴 수 있고, 연습 문제는 오답 기록을 실제로 지운다
+    $$("[data-wl-clear]", root).forEach(function (b) {
+      b.addEventListener("click", function () {
+        if (b.dataset.wlClear === "practice") {
+          if (!confirm("연습 문제 오답 " + S.wrong.length + "문항을 모두 비울까요?\n실전 기출 오답은 그대로 남습니다.")) return;
+          S.wrong = [];
+        } else {
+          var keys = mockWrongItems(null).map(function (q) { return q.ex.round + ":" + q.i; });
+          if (!confirm("실전 기출 오답 " + keys.length + "문항을 모두 지울까요?\n점수 기록과 연습 문제 오답은 그대로 남고, '되돌리기'로 다시 볼 수 있습니다.")) return;
+          keys.forEach(function (k) { mockMark("mockHide")[k] = true; });
+        }
         save();
         renderWrong(); paintModes();
       });
@@ -2916,7 +2945,7 @@
       bindTopicButtons(host); bindWrongRows(host); bindExpandButtons(host);
       return;
     }
-    host.innerHTML = mockHtml + (mockHtml ? '<h2 class="wrong-sub">연습 문제 오답</h2>' : "") + S.wrong.map(function (w) {
+    host.innerHTML = mockHtml + wrongSecHtml("연습 문제 오답", S.wrong.length, "practice", "연습 문제 오답 비우기") + S.wrong.map(function (w) {
       var q = qById(w.id);
       if (!q) return "";
       return '<div class="wrong-item' + (w.seen ? " seen" : "") + '">' +
@@ -2961,10 +2990,6 @@
       $("#quiz-result").classList.add("hidden");
       $("#quiz-run").classList.remove("hidden");
       renderQuestion();
-    });
-    $("#wrong-clear").addEventListener("click", function () {
-      if (!confirm("연습 문제 오답을 모두 비울까요? (실전 기출 점수 기록은 그대로 남습니다)")) return;
-      S.wrong = []; save(); renderWrong();
     });
   }
 
