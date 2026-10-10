@@ -584,11 +584,11 @@
     S.final.done[date][key] = on;
     save();
   }
-  // 오늘부터 시험 전날까지 날짜마다 풀 회차를 정한다. 안 푼 회차를 최신부터, 다 풀었으면 점수가 낮았던 회차를 다시.
+  // 오늘부터 시험 전날까지 날짜마다 풀 회차를 정한다. 안 푼 회차를 예전 회차부터(가장 최근 회차를 시험 직전에), 다 풀었으면 점수가 낮았던 회차를 다시.
   // 오늘 이미 채점한 회차가 있으면 그것이 오늘 몫이다
   function finalPlan() {
     var t = todayStr(), left = daysBetween(t, window.EXAM_DATE);
-    var all = EXAMS.slice().sort(function (a, b) { return b.round - a.round; });
+    var all = EXAMS.slice().sort(function (a, b) { return a.round - b.round; });
     var todayRound = null;
     all.forEach(function (ex) {
       var r = lastRec(ex.round);
@@ -699,7 +699,7 @@
       "<span>실전 기출 " + fp.taken.length + " / " + total + "회 풂</span></div>" +
       '<p class="sprint-ctl-note">' + (fp.left < 0 ? "다음 시험을 준비한다면 위에서 기본 플랜으로 바꾸세요."
         : fp.left === 0 ? "새로 외우지 말고 틀린 문제의 노란 상자만 한 번 훑고 들어가세요."
-        : "하루에 기출 한 회를 풀고, 틀린 문제 카드를 읽고, 맞춤 문제로 마무리합니다. 안 푼 회차를 최신 회차부터 잡고, 다 풀면 점수가 낮았던 회차를 다시 풉니다. 시험 전날은 새 문제 없이 복습만 합니다.") + "</p>" +
+        : "하루에 기출 한 회를 풀고, 틀린 문제 카드를 읽고, 맞춤 문제로 마무리합니다. 안 푼 회차를 예전 회차부터 차례로 잡고, 다 풀면 점수가 낮았던 회차를 다시 풉니다. 시험 전날은 새 문제 없이 복습만 합니다.") + "</p>" +
       (chips ? '<div class="fin-chips"><span>푼 회차 오답 보기</span>' + chips + "</div>" : "") +
       (fp.left > 0 && fp.spare.length ? '<p class="sprint-ctl-note">남은 날보다 안 푼 회차가 ' + fp.spare.length + "개 많습니다(" +
         fp.spare.map(function (r) { return r + "회"; }).join(", ") + "). 시간이 되는 날 한 회 더 푸세요.</p>" : "") + "</div>";
