@@ -2779,7 +2779,7 @@
     var tag = ex.tags[i], era = tagEra(tag), key = ex.round + ":" + i, seen = !!opts.check && mockSeenOn(key);
     return '<div class="mock-wrong wl-row' + (seen ? " seen" : "") + '" data-crop="' + key + '"' +
       (examNote(ex.round, i) ? ' data-exnote="' + key + ":" + (mine || 0) + '"' : "") + ">" +
-      (opts.check ? '<button class="plan-check' + (seen ? " on" : "") + '" data-wl-check="' + key + '" aria-label="' + (i + 1) + '번 본 것으로 표시">' + (seen ? "✓" : "") + "</button>" : "") +
+      (opts.check ? '<button class="plan-check' + (seen ? " on" : "") + '" data-wl-check="' + key + '" aria-pressed="' + seen + '" aria-label="' + (i + 1) + '번 본 것으로 표시"></button>' : "") +
       '<span class="mock-wq">' + (i + 1) + "번</span>" +
       '<span class="mock-wtag"><span class="q-tag">' + esc(ERA_NAMES[era] || era) + "</span> " + esc(tag[1]) + "</span>" +
       '<span class="mock-wans">' + (mine ? "내 답 " + CIRCLED[mine - 1] : "무응답") + " → 정답 <b>" + CIRCLED[+ex.ans[i] - 1] + "</b>" +
@@ -2793,12 +2793,12 @@
     openCrop(row);
     if (row.dataset.exnote) openNote(row);
   }
-  // 체크 표시를 그 자리에서 바꾼다 (목록을 다시 그리면 펼쳐 둔 줄이 접힌다)
+  // 본 것 표시를 그 자리에서 바꾼다 (목록을 다시 그리면 펼쳐 둔 줄이 접힌다). 체크 모양 없이 상자에 색만 채운다
   function paintSeen(item, on) {
     var c = $(".plan-check", item);
     item.classList.toggle("seen", on);
     c.classList.toggle("on", on);
-    c.textContent = on ? "✓" : "";
+    c.setAttribute("aria-pressed", on ? "true" : "false");
     $(".wl-del", item).classList.toggle("hidden", !on);
   }
   function bindWrongRows(root) {
@@ -2918,7 +2918,7 @@
       var q = qById(w.id);
       if (!q) return "";
       return '<div class="wrong-item' + (w.seen ? " seen" : "") + '">' +
-        '<div class="wi-head"><button class="plan-check' + (w.seen ? " on" : "") + '" data-wi-check="' + esc(q.id) + '" aria-label="본 것으로 표시">' + (w.seen ? "✓" : "") + "</button>" +
+        '<div class="wi-head"><button class="plan-check' + (w.seen ? " on" : "") + '" data-wi-check="' + esc(q.id) + '" aria-pressed="' + !!w.seen + '" aria-label="본 것으로 표시"></button>' +
         '<div class="q-meta"><span class="q-tag">' + esc(ERA_NAMES[q.era] || q.era) + "</span>" +
         '<span class="q-tag">' + esc(q.topic) + '</span><span class="q-tag">' + w.at + "</span></div>" +
         '<button class="mini danger wl-del' + (w.seen ? "" : " hidden") + '" data-wi-del="' + esc(q.id) + '">삭제</button></div>' +
