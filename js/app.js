@@ -244,6 +244,7 @@
     $$(".view").forEach(function (v) { v.classList.toggle("active", v.id === "view-" + name); });
     window.scrollTo(0, 0);
     if (name === "dash") renderDash();
+    if (name === "plan" && finalOn()) renderPlan();
     if (name === "wrong") renderWrong();
     if (name === "analysis") renderAnalysis();
     if (name === "quiz") renderAdaptiveCard();
@@ -520,7 +521,177 @@
     });
   }
 
+  // ---------- 막판 기출 플랜 ----------
+  // 진도를 끝낸 뒤 시험 전날까지: 하루에 기출 한 회 → 틀린 문제 카드 → 맞춤 문제. 시험 전날은 복습만.
+  // S.planMode가 "final"이면 학습 플랜 탭과 대시보드의 오늘 학습이 이 플랜으로 바뀐다. 기본 31일 플랜과 체크 기록은 그대로 남는다.
+  // S.final = { done: { 날짜: { review, adapt, ... } } } 에는 손으로 체크하는 항목만 적는다. 기출을 풀었는지는 채점 기록으로 안다
+  function finalOn() { return S.planMode === "final"; }
+  function lastRec(round) {
+    var h = mockState().hist[round] || [];
+    return h.length ? h[h.length - 1] : null;
+  }
+  function finalChecks(date) { return ((S.final || {}).done || {})[date] || {}; }
+  function setFinalCheck(date, key, on) {
+    if (!S.final) S.final = { done: {} };
+    if (!S.final.done[date]) S.final.done[date] = {};
+    S.final.done[date][key] = on;
+    save();
+  }
+  // 오늘부터 시험 전날까지 날짜마다 풀 회차를 정한다. 안 푼 회차를 최신부터, 다 풀었으면 점수가 낮았던 회차를 다시.
+  // 오늘 이미 채점한 회차가 있으면 그것이 오늘 몫이다
+  function finalPlan() {
+    var t = todayStr(), left = daysBetween(t, window.EXAM_DATE);
+    var all = EXAMS.slice().sort(function (a, b) { return b.round - a.round; });
+    var todayRound = null;
+    all.forEach(function (ex) {
+      var r = lastRec(ex.round);
+      if (todayRound == null && r && r.at === t) todayRound = ex.round;
+    });
+    var taken = all.filter(function (ex) { return lastRec(ex.round); });
+    var fresh = all.filter(function (ex) { return !lastRec(ex.round); }).map(function (ex) { return ex.round; });
+    var again = taken.filter(function (ex) { return ex.round !== todayRound; })
+      .sort(function (a, b) { return lastRec(a.round).score - lastRec(b.round).score; }).map(function (ex) { return ex.round; });
+    var days = [];
+    for (var i = 0; i < left; i++) {
+      var row = { date: addDays(t, i), eve: i === left - 1, round: null, retry: false };
+      if (!row.eve) {
+        if (i === 0 && todayRound != null) row.round = todayRound;
+        else if (fresh.length) row.round = fresh.shift();
+        else if (again.length) { row.round = again.shift(); row.retry = true; }
+      }
+      days.push(row);
+    }
+    return { left: left, days: days, spare: fresh, taken: taken };
+  }
+  // 다른 회차를 푸는 중이면 회차 목록만 보여 준다 (찍어 둔 답을 말없이 지우지 않으려고)
+  function openMockRound(round) {
+    var cur = mockState().cur;
+    showView("mock");
+    if (cur && cur.round !== round && cur.ans.some(function (a) { return a; })) return renderMockPick();
+    startMock(round, false);
+  }
+  // key가 없으면 저절로 체크되는 줄 (기출 채점)
+  function finalRow(key, on, label, sub, btn) {
+    var check = key
+      ? '<button class="plan-check' + (on ? " on" : "") + '" data-fin-check="' + key + '" aria-label="' + label + ' 완료 표시">' + (on ? "✓" : "") + "</button>"
+      : '<span class="plan-check' + (on ? " on" : "") + '" title="채점하면 저절로 체크됩니다">' + (on ? "✓" : "") + "</span>";
+    return '<li class="sp-item fin-item' + (on ? " done" : "") + '">' + check +
+      '<span class="sp-title">' + label + (sub ? " <small>" + sub + "</small>" : "") + "</span>" + (btn || "") + "</li>";
+  }
+  // 오늘 할 일 목록. 대시보드와 학습 플랜 탭이 같이 쓴다
+  function finalTodayList(fp) {
+    var t = todayStr(), d = fp.days[0], c = finalChecks(t);
+    if (d.eve) {
+      return '<ul class="sprint-list">' +
+        finalRow("e1", c.e1, "틀린 문제의 노란 상자만 훑기", "", fp.taken.length ? '<button class="mini" data-fin-wrong="">기출 오답</button>' : "") +
+        finalRow("e2", c.e2, "연표 한 번 보기", "", '<button class="mini" data-fin-view="timeline">연표</button>') +
+        finalRow("e3", c.e3, "수험표·신분증·컴퓨터용 사인펜 챙기고 일찍 자기", "", "") + "</ul>";
+    }
+    var rec = d.round != null ? lastRec(d.round) : null, solved = !!rec && rec.at === t, due = dueIds().length;
+    return '<ul class="sprint-list">' +
+      (d.round != null ? finalRow("", solved, "실전 기출 제" + d.round + "회 " + (d.retry ? "다시 " : "") + "풀기",
+        solved ? rec.score + "점" : d.retry ? "지난번 " + rec.score + "점 · 80분" : "80분",
+        solved ? '<button class="mini" data-fin-result="' + d.round + '">결과</button>'
+          : '<button class="mini active" data-fin-mock="' + d.round + '">풀기</button>') : "") +
+      finalRow("review", c.review, "틀린 문제 카드 읽기", solved || d.round == null ? "" : "풀고 나서",
+        fp.taken.length ? '<button class="mini" data-fin-wrong="' + (solved ? d.round : "") + '">기출 오답</button>' : "") +
+      finalRow("adapt", c.adapt, "맞춤 문제 20문항", due ? "복습 " + due : "", '<button class="mini adapt-btn" data-fin-adapt>풀기</button>') + "</ul>";
+  }
+  function bindFinal(root) {
+    $$("[data-fin-check]", root).forEach(function (b) {
+      b.addEventListener("click", function () {
+        var t = todayStr(), k = b.dataset.finCheck;
+        setFinalCheck(t, k, !finalChecks(t)[k]);
+        renderToday(); renderPlan();
+      });
+    });
+    $$("[data-fin-mock]", root).forEach(function (b) {
+      b.addEventListener("click", function () { openMockRound(+b.dataset.finMock); });
+    });
+    $$("[data-fin-result]", root).forEach(function (b) {
+      b.addEventListener("click", function () { var r = +b.dataset.finResult; showView("mock"); renderMockResult(r, lastRec(r)); });
+    });
+    $$("[data-fin-wrong]", root).forEach(function (b) {
+      b.addEventListener("click", function () { showView("concept"); showWrong(b.dataset.finWrong ? +b.dataset.finWrong : null); });
+    });
+    $$("[data-fin-adapt]", root).forEach(function (b) { b.addEventListener("click", function () { startAdaptive(20); }); });
+    $$("[data-fin-view]", root).forEach(function (b) { b.addEventListener("click", function () { showView(b.dataset.finView); }); });
+  }
+  function finalDayTitle(d) {
+    return d.eve ? "새 문제 없이 복습만" : d.round != null ? "실전 기출 제" + d.round + "회" + (d.retry ? " 다시 풀기" : "") : "오답 복습";
+  }
+  function renderFinalToday() {
+    var box = $("#today-box"), fp = finalPlan(), total = EXAMS.length;
+    if (fp.left <= 0) {
+      box.innerHTML = '<div class="today-day">막판 기출 플랜</div>' +
+        '<div class="today-title">' + (fp.left === 0 ? "오늘이 시험입니다" : "시험이 끝났습니다") + "</div>" +
+        '<p class="today-note">' + (fp.left === 0 ? "새로 외우지 말고 틀린 문제의 노란 상자만 한 번 훑고 들어가세요. 1·2점 문항부터 확실히 잡으면 됩니다."
+          : "수고했습니다. 다음 시험을 준비한다면 학습 플랜 탭에서 기본 플랜으로 바꾸세요.") + "</p>" +
+        (fp.left === 0 && fp.taken.length ? '<div class="today-actions"><button class="mini" data-fin-wrong="">기출 오답</button></div>' : "");
+      return bindFinal(box);
+    }
+    var d = fp.days[0];
+    box.innerHTML =
+      '<div class="today-day">막판 기출 플랜 · 시험까지 ' + fp.left + "일</div>" +
+      '<div class="today-title">' + (d.eve ? "시험 전날 · " : "오늘 · ") + finalDayTitle(d) + " <small>" + dateLabel(d.date) + "</small></div>" +
+      '<div class="prog-row"><div class="prog-label"><span>실전 기출</span><small>' + fp.taken.length + " / " + total + '회 풂</small></div>' +
+      '<div class="bar"><i style="width:' + (total ? Math.round(fp.taken.length / total * 100) : 0) + '%"></i></div></div>' +
+      finalTodayList(fp) +
+      '<p class="today-note">' + (d.eve ? "오늘은 점수를 올리는 날이 아니라 잊지 않는 날입니다."
+        : "푸는 시간만큼 오답 카드를 읽어야 점수가 오릅니다. 1·2점 문항만 다 맞혀도 70점입니다.") + "</p>" +
+      '<div class="today-actions"><button class="mini" data-fin-view="plan">남은 일정</button><button class="mini" data-fin-view="analysis">약점 분석</button></div>';
+    bindFinal(box);
+  }
+  function renderFinalPlan() {
+    var host = $("#plan-list"), fp = finalPlan(), total = EXAMS.length;
+    var chips = fp.taken.map(function (ex) {
+      return '<button class="mini" data-fin-wrong="' + ex.round + '">' + ex.round + "회 <b>" + lastRec(ex.round).score + "점</b></button>";
+    }).join("");
+    var html = '<div class="card fin-sum"><div class="fin-sum-top"><b>' +
+      (fp.left > 0 ? "시험까지 " + fp.left + "일" : fp.left === 0 ? "오늘이 시험입니다" : "시험이 끝났습니다") + "</b>" +
+      "<span>실전 기출 " + fp.taken.length + " / " + total + "회 풂</span></div>" +
+      '<p class="sprint-ctl-note">' + (fp.left < 0 ? "다음 시험을 준비한다면 위에서 기본 플랜으로 바꾸세요."
+        : fp.left === 0 ? "새로 외우지 말고 틀린 문제의 노란 상자만 한 번 훑고 들어가세요."
+        : "하루에 기출 한 회를 풀고, 틀린 문제 카드를 읽고, 맞춤 문제로 마무리합니다. 안 푼 회차를 최신 회차부터 잡고, 다 풀면 점수가 낮았던 회차를 다시 풉니다. 시험 전날은 새 문제 없이 복습만 합니다.") + "</p>" +
+      (chips ? '<div class="fin-chips"><span>푼 회차 오답 보기</span>' + chips + "</div>" : "") +
+      (fp.left > 0 && fp.spare.length ? '<p class="sprint-ctl-note">남은 날보다 안 푼 회차가 ' + fp.spare.length + "개 많습니다(" +
+        fp.spare.map(function (r) { return r + "회"; }).join(", ") + "). 시간이 되는 날 한 회 더 푸세요.</p>" : "") + "</div>";
+    fp.days.forEach(function (d, i) {
+      html += '<div class="plan-item' + (i === 0 ? " today" : "") + '"><div class="plan-body">' +
+        '<div class="plan-meta"><span>' + dateLabel(d.date) + "</span>" + (i === 0 ? '<span class="badge-today">오늘</span>' : "") +
+        (d.eve ? "<span>시험 전날</span>" : "") + "</div>" +
+        '<div class="plan-title">' + finalDayTitle(d) + "</div>" +
+        (i === 0 ? finalTodayList(fp) : '<div class="fin-steps">' + (d.eve ? "노란 상자 훑기 → 연표 한 번 → 준비물 챙기고 일찍 자기"
+          : "풀기 80분 → 틀린 문제 카드 읽기 → 맞춤 문제 20문항") + "</div>") +
+        "</div></div>";
+    });
+    if (fp.left >= 0) {
+      html += '<div class="plan-item fin-exam"><div class="plan-body"><div class="plan-meta"><span>' + dateLabel(window.EXAM_DATE) +
+        '</span></div><div class="plan-title">한국사능력검정시험</div></div></div>';
+    }
+    host.innerHTML = html;
+    bindFinal(host);
+  }
+  // 플랜 종류를 바꾼다. 막판 플랜에는 '오늘 범위'가 없어서, 그걸 보던 중이면 기출 오답으로 돌린다
+  function setPlanMode(m) {
+    S.planMode = m === "final" ? "final" : "base";
+    save();
+    if (finalOn() && rangeDay != null) { rangeDay = null; wrongOn = true; }
+    renderPlan(); renderToday(); renderConcept();
+  }
+  function paintPlanMode() {
+    var fin = finalOn();
+    $$("#plan-mode [data-plan-mode]").forEach(function (b) { b.classList.toggle("active", (b.dataset.planMode === "final") === fin); });
+    $("#plan-course").classList.toggle("hidden", fin);
+    $("#plan-title").textContent = fin ? "막판 기출 플랜" : "31일 학습 플랜";
+    $("#plan-desc").textContent = fin ? "진도를 끝낸 뒤 시험 전날까지 기출과 오답만 돌립니다. 기본 플랜과 체크 기록은 그대로 남아 있어 언제든 돌아갈 수 있습니다."
+      : "오늘 날짜에 맞춰 자동으로 하이라이트됩니다. 체크하면 진도율에 반영됩니다.";
+  }
+  // 문제를 낼 범위: 기본 플랜은 오늘 진도까지, 막판 플랜은 전 범위
+  function learnedDay() { return finalOn() ? Infinity : todayLastDay(); }
+
   function renderToday() {
+    if (finalOn()) return renderFinalToday();
     if (sprintOn()) return renderSprintToday();
     var p = currentPlan();
     var box = $("#today-box");
@@ -630,6 +801,9 @@
 
   // ---------- 학습 플랜 ----------
   function initPlanCourse() {
+    $$("#plan-mode [data-plan-mode]").forEach(function (b) {
+      b.addEventListener("click", function () { setPlanMode(b.dataset.planMode); });
+    });
     $$("#plan-course button").forEach(function (b) {
       b.classList.toggle("active", b.dataset.course === (S.course || "all"));
       b.addEventListener("click", function () {
@@ -642,6 +816,8 @@
   }
 
   function renderPlan() {
+    paintPlanMode();
+    if (finalOn()) return renderFinalPlan();
     var host = $("#plan-list");
     var todaySet = (sprintOn() ? sprintBatch() : todayDays()).map(function (d) { return d.day; });
     var planCourse = S.course || "all";
@@ -796,6 +972,7 @@
     try { mode = localStorage.getItem(MODE_KEY) || "range"; } catch (e) {}
     rangeDay = mode === "range" ? "today" : null;
     wrongOn = mode === "wrong";
+    if (finalOn() && rangeDay != null) { rangeDay = null; wrongOn = true; }
     try { if (localStorage.getItem(WRONG_VIEW_KEY) === "lines") wrongView = "lines"; } catch (e) {}
 
     $("#concept-modes").addEventListener("click", function (e) {
@@ -878,7 +1055,7 @@
   function renderToc() {
     var q = $("#concept-search").value.trim().toLowerCase();
     var host = $("#concept-toc");
-    var inRange = rangeIds(), today = todayPlan().concepts;
+    var inRange = rangeIds(), today = finalOn() ? [] : todayPlan().concepts;
     var list = TOPICS.filter(function (x) {
       if (!q) return true;
       var t = x.t;
@@ -943,6 +1120,7 @@
 
   function paintModes() {
     $("#mode-range-day").textContent = "DAY " + todayPlan().day;
+    $('#concept-modes [data-mode="range"]').classList.toggle("hidden", finalOn());
     var n = mockWrongItems(null).length;
     $("#mode-wrong-n").textContent = n ? n + "문항" : "";
     var cur = wrongOn ? "wrong" : rangeDay != null ? "range" : "all";
@@ -1567,7 +1745,7 @@
   }
 
   // 맞춤 문제: 복습 차례 문제를 먼저, 나머지는 배운 범위(오늘 포함)에서 약한 주제 위주로
-  function adaptiveFilter() { return { concepts: conceptsUpTo(todayLastDay()) }; }
+  function adaptiveFilter() { return { concepts: conceptsUpTo(learnedDay()) }; }
   function adaptiveList(n) {
     var due = shuffle(dueIds().map(qById));
     var have = {};
@@ -1643,7 +1821,7 @@
   }
 
   function setupFilter() {
-    if (quizEras[0] === "learned") return { concepts: conceptsUpTo(todayLastDay()) };
+    if (quizEras[0] === "learned") return { concepts: conceptsUpTo(learnedDay()) };
     return { eras: quizEras };
   }
 
@@ -1831,6 +2009,7 @@
   }
 
   function finishQuiz() {
+    if (finalOn() && run.adaptive && run.list.length >= 20) setFinalCheck(todayStr(), "adapt", true);
     if (run.mode === "test") {
       run.list.forEach(function (q, i) {
         if (run.answers[i] !== undefined) record(q, run.answers[i]);

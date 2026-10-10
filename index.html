@@ -102,8 +102,12 @@
   <!-- 학습 플랜 -->
   <section class="view" id="view-plan">
     <div class="view-head">
-      <h1>31일 학습 플랜</h1>
-      <p>오늘 날짜에 맞춰 자동으로 하이라이트됩니다. 체크하면 진도율에 반영됩니다.</p>
+      <h1 id="plan-title">31일 학습 플랜</h1>
+      <p id="plan-desc">오늘 날짜에 맞춰 자동으로 하이라이트됩니다. 체크하면 진도율에 반영됩니다.</p>
+    </div>
+    <div class="concept-modes" id="plan-mode" role="group" aria-label="플랜 종류">
+      <button class="mini active" type="button" data-plan-mode="base">기본 플랜 <small>31일 진도</small></button>
+      <button class="mini" type="button" data-plan-mode="final">막판 플랜 <small>기출 집중</small></button>
     </div>
     <div class="btn-group" id="plan-course" style="margin-bottom:16px">
       <button class="mini active" data-course="all">1급 코스 · 31일 전부</button>
