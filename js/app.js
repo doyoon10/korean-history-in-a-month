@@ -1274,22 +1274,67 @@
       return k.toks.length > 0 && k.toks.every(function (w) { return t.indexOf(w) !== -1; });
     }).map(function (k) { return k.id; });
   }
-  // 문항 꼬리표에서 찾기: 꼬리표 낱말이 사진 이름의 낱말과 같거나 이름에 들어 있으면 맞는 것으로 본다
-  // ("종묘" → 종묘 정전, "금관" → 금관총 금관, "광개토대왕" → 광개토대왕릉비)
-  function imagesForTags(labels) {
-    var t = plainName(labels.join(" ")), toks = [];
-    labels.forEach(function (l) { toks = toks.concat(tagTokens(l)); });
-    return IMG_KEYS.filter(function (k) {
-      if (t.indexOf(k.full) !== -1 || k.long.some(function (w) { return t.indexOf(w) !== -1; })) return true;
-      return toks.some(function (w) { return k.toks.indexOf(w) !== -1 || (w.length >= 3 && k.full.indexOf(plainName(w)) !== -1); });
+  // 문항에 붙일 사진 찾기: 글에 그 문화유산의 이름이 또렷이 나올 때만 고른다.
+  // 이름 전체(괄호 앞까지만 쓴 것 포함), 그 사진 이름에만 있는 긴 낱말(정림사지, 세한도), 따로 적어 둔 다른 이름 중 하나가 나와야 한다.
+  // 여러 곳에 두루 쓰이는 말(IMG_VAGUE)로는 찾지 않는다 ("고분군"만 보고 지산동 고분군을 붙이지 않게)
+  var IMG_VAGUE = {};
+  "고분군 돌무지무덤 대웅전 극락전 사신도 팔각정 화엄사 러시아 공사관 상하이 호랑이 진흥왕 북한산 서대문 총독부 선언서 3·1 한성의 1899년".split(" ")
+    .forEach(function (w) { IMG_VAGUE[w] = true; });
+  var IMG_ALIAS = { jongmyo: "종묘", seokga: "불국사 3층 석탑", sosu: "백운동 서원", hahoe: "하회 마을", byeongsan: "병산 서원", uigwe: "의궤",
+    russia: "러시아 공사관", imjeong: "임시 정부 청사", kkachi: "까치 호랑이", tram: "전차", seosan: "서산 마애", tapgol: "탑골 공원",
+    chongdokbu: "총독부 청사", seodaemun: "서대문 형무소", ssireum: "씨름", mudong: "무동" };
+  var IMG_EXACT = (function () {
+    var n = {};
+    IMG_KEYS.forEach(function (k) { k.long.forEach(function (w) { n[w] = (n[w] || 0) + 1; }); });
+    return IMG_KEYS.map(function (k) {
+      var names = [k.full, plainName(window.IMAGES[k.id].name.split("(")[0])];
+      if (IMG_ALIAS[k.id]) names.push(plainName(IMG_ALIAS[k.id]));
+      k.long.forEach(function (w) { if (n[w] === 1 && !IMG_VAGUE[w]) names.push(plainName(w)); });
+      return { id: k.id, names: names.filter(Boolean) };
+    });
+  })();
+  function photosIn(text) {
+    var t = plainName(text);
+    return IMG_EXACT.filter(function (k) { return k.names.some(function (w) { return t.indexOf(w) !== -1; }); })
+      .map(function (k) { return k.id; });
+  }
+  // 보기 글이 문화유산 이름 그 자체인가 ("월정사 8각 9층 석탑(고려)", "세한도 → 김정희").
+  // 이름이 보기 앞부분(화살표와 괄호 앞)의 3/4 이상을 차지할 때만 그 사진을 돌려준다 ("우정총국 개국 축하연"은 아니다)
+  function itemPhotos(v) {
+    var head = plainName(v.split(" → ")[0].split("(")[0]);
+    if (!head) return [];
+    return IMG_EXACT.filter(function (k) {
+      return k.names.some(function (w) { return head.indexOf(w) !== -1 && w.length >= head.length * 0.75; });
     }).map(function (k) { return k.id; });
   }
-  // 틀린 문제에 바로 해당하는 사진을 먼저, 그다음 고른 줄에 나오는 사진. 많아야 8장
+  // 틀린 문항 하나에 붙일 사진, 많아야 5장.
+  // 문항 꼬리표와 풀이에 이름이 나오는 것은 늘 붙인다. 보기 가운데 둘 이상이 문화유산 이름이면 사진 보기 문제로 보고,
+  // 정답 → 내가 고른 것 → 나머지 보기 → 꼭 알아야 할 것 순으로 더 붙인다 (글로 된 보기에 스치듯 나온 이름은 붙이지 않는다)
+  var notePhotoCache = {};
+  function notePhotos(q) {
+    var key = q.ex.round + ":" + q.i + ":" + (q.mine || 0);
+    if (notePhotoCache[key]) return notePhotoCache[key];
+    var n = examNote(q.ex.round, q.i), out = [];
+    function add(list) { list.forEach(function (im) { if (out.indexOf(im) === -1) out.push(im); }); }
+    add(photosIn(q.ex.tags[q.i][1]));
+    if (n) {
+      add(photosIn(n.a));
+      var items = n.x.map(itemPhotos);
+      if (items.filter(function (l) { return l.length; }).length >= 2) {
+        add(items[+q.ex.ans[q.i] - 1]);
+        if (q.mine) add(items[q.mine - 1]);
+        items.forEach(add);
+        n.k.forEach(function (t) { add(photosIn(t)); });
+      }
+    }
+    return (notePhotoCache[key] = out.slice(0, 5));
+  }
+  // 필기 줄을 펼쳤을 때 줄 아래에 붙일 사진: 고른 줄에 나오는 것 가운데, 문항 카드에 이미 붙인 사진은 뺀다. 많아야 8장
   function wrongPhotos(id, grp) {
-    var out = imagesForTags(grp.qs.map(function (q) { return q.tag[1]; })), text = "";
+    var shown = {}, text = "";
+    grp.qs.forEach(function (q) { notePhotos(q).forEach(function (im) { shown[im] = true; }); });
     topicBullets(id).forEach(function (r) { if (grp.picks[r.key]) text += " " + r.plain; });
-    imagesFor(text).forEach(function (im) { if (out.indexOf(im) === -1) out.push(im); });
-    return out.slice(0, 8);
+    return imagesFor(text).filter(function (im) { return !shown[im]; }).slice(0, 8);
   }
   function wrongGroups() {
     var by = {}, loose = [];
@@ -1319,7 +1364,7 @@
   function examNoteHtml(q) {
     var n = examNote(q.ex.round, q.i);
     if (!n) return "";
-    var era = tagEra(q.ex.tags[q.i]), seen = {}, seenAll = {}, right = +q.ex.ans[q.i];
+    var era = tagEra(q.ex.tags[q.i]), seen = {}, seenAll = {}, right = +q.ex.ans[q.i], ph = notePhotos(q);
     function tx(v, sn) { return linkTerms(fmt(v), era, sn || seen); }
     // 보기 풀이 "무엇 → 누구·언제"는 화살표 뒤(정체)를 굵게 한다. 화살표가 하나일 때만
     function opt(k, cls, label, sn) {
@@ -1336,7 +1381,8 @@
     return '<div class="wq-note"><div class="wq-opts">' + top +
       '<details class="wq-rest"><summary>보기 5개 모두 보기</summary>' + all + "</details></div>" +
       '<p class="wq-why"><span class="wq-lab">풀이</span>' + tx(n.a) + "</p>" +
-      '<div class="wq-key"><h4>꼭 알아야 할 것</h4><ul>' + n.k.map(function (v) { return "<li>" + tx(v) + "</li>"; }).join("") + "</ul></div></div>";
+      '<div class="wq-key"><h4>꼭 알아야 할 것</h4><ul>' + n.k.map(function (v) { return "<li>" + tx(v) + "</li>"; }).join("") + "</ul></div>" +
+      (ph.length ? '<div class="photo-row wq-photos">' + ph.map(function (im) { return figureHtml(im, true); }).join("") + "</div>" : "") + "</div>";
   }
   function wrongCardHtml(q) {
     return '<div class="wq-card">' + wrongRowHtml(q) + examNoteHtml(q) + "</div>";
@@ -1377,19 +1423,16 @@
       } else html += '<p class="range-empty">틀린 문제가 없습니다.</p>';
       html += g.order.map(function (id, k) {
         var x = TOPICS[topicIndex(id)], grp = g.by[id], show = wrongShowOf(id, grp);
-        var tags = grp.qs.map(function (q) { return q.tag[1]; });
         var head = '<div class="range-head"><span class="range-num">' + (k + 1) + "</span>" +
           '<div><div class="range-era">' + esc(x.era.name) + '</div><h3 class="range-topic">' + esc(x.t.title) + masteryBadge(id) + "</h3></div></div>" +
           '<div class="wq-cards">' + grp.qs.map(wrongCardHtml).join("") + "</div>";
         function btn(to, label) { return '<button type="button" class="mini" data-wtopic="' + id + '" data-wshow="' + to + '">' + label + "</button>"; }
         if (show === "key") {
-          var ph = imagesForTags(tags);
           return '<section class="topic-page" id="topic-' + id + '">' + head +
-            (ph.length ? '<div class="photo-row">' + ph.map(function (im) { return figureHtml(im, true); }).join("") + "</div>" : "") +
             '<div class="wq-more">' + btn("lines", grp.whole ? "이 주제 필기 보기" : "필기에서 관련 줄 보기") + "</div></section>";
         }
         var full = show === "full";
-        return topicHtml(x, head, full ? null : grp.picks, full ? imagesForTags(tags) : wrongPhotos(id, grp)) +
+        return topicHtml(x, head, full ? null : grp.picks, full ? [] : wrongPhotos(id, grp)) +
           '<div class="wq-more">' + (grp.whole ? "" : btn(full ? "lines" : "full", full ? "관련 줄만 보기" : "주제 전체 보기")) +
           btn("key", "필기 접기") + "</div>";
       }).join("");

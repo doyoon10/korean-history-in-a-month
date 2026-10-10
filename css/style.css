@@ -748,6 +748,8 @@ html.theme-vt::view-transition-new(root){animation-name:theme-fade-in}
 @keyframes dlg-pop{from{opacity:0;transform:translateY(8px) scale(.97)}}
 @media (prefers-reduced-motion:reduce){.dlg-back,.dlg{animation:none}}
 @media (max-width:480px){.dlg-btns .mini{flex:1}}
+.wq-note .wq-photos{grid-template-columns:repeat(auto-fill,minmax(120px,1fr));margin:0}
+.wq-note .wq-photos img{height:120px}
 .wq-view{margin-top:10px}
 .wq-view .wq-open{margin-left:auto}
 .exp-note{margin:8px 0 0}
