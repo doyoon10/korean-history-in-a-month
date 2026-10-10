@@ -1064,13 +1064,15 @@
     var order = TOPICS.map(function (x) { return x.t.id; }).filter(function (id) { return by[id]; });
     return { by: by, order: order, loose: loose };
   }
+  // 카드 머리: 번호, 무엇을 묻는 문제인지, 배점. 풀이가 없는 문항만 내 답과 정답을 여기에 적는다
   function wrongRowHtml(q) {
+    var noted = examNote(q.ex.round, q.i);
     return '<div class="mock-wrong"><span class="mock-wq">' + q.ex.round + "회 " + (q.i + 1) + "번</span>" +
       '<span class="mock-wtag">' + esc(q.tag[1]) + "</span>" +
-      '<span class="mock-wans">' + (q.mine ? "내 답 " + CIRCLED[q.mine - 1] : "무응답") + " → 정답 <b>" + CIRCLED[+q.ex.ans[q.i] - 1] + "</b> · " + q.ex.pts[q.i] + "점</span>" +
+      '<span class="mock-wans">' + (noted ? "" : (q.mine ? "내 답 " + CIRCLED[q.mine - 1] : "무응답") + " → 정답 <b>" + CIRCLED[+q.ex.ans[q.i] - 1] + "</b> · ") + q.ex.pts[q.i] + "점</span>" +
       '<button class="mini" data-crop="' + q.ex.round + ":" + q.i + '">문제 보기</button></div>';
   }
-  // 문항 풀이(js/data/exam_notes_*.js): 꼭 알아야 할 것, 왜 그 답인가, 내가 고른 보기, 나머지 보기
+  // 문항 풀이(js/data/exam_notes_*.js): 내 답과 정답을 나란히, 그 아래 풀이, 맨 아래 꼭 알아야 할 것
   function examNote(round, i) {
     var r = (window.EXAM_NOTES || {})[round];
     return (r && r[i]) || null;
@@ -1078,18 +1080,22 @@
   function examNoteHtml(q) {
     var n = examNote(q.ex.round, q.i);
     if (!n) return "";
-    var era = tagEra(q.ex.tags[q.i]), seen = {}, right = +q.ex.ans[q.i], rest = "";
+    var era = tagEra(q.ex.tags[q.i]), seen = {}, right = +q.ex.ans[q.i], rest = "", nRest = 0;
     function tx(v) { return linkTerms(fmt(v), era, seen); }
-    var key = n.k.map(function (v) { return "<li>" + tx(v) + "</li>"; }).join("");
-    var why = "<p>" + tx(n.a) + "</p>", miss = q.mine ? tx(n.x[q.mine - 1]) : "";
+    // 보기 풀이 "무엇 → 누구·언제"는 화살표 뒤(정체)를 굵게 한다. 화살표가 하나일 때만
+    function opt(k, cls, label) {
+      var p = n.x[k].split(" → ");
+      return '<div class="wq-opt' + cls + '"><span class="wq-badge">' + label + CIRCLED[k] + '</span><span class="wq-opt-t">' +
+        (p.length === 2 ? tx(p[0]) + '<i class="wq-to">→</i><b>' + tx(p[1]) + "</b>" : tx(n.x[k])) + "</span></div>";
+    }
+    var top = (q.mine ? opt(q.mine - 1, " no", "내 답 ") : "") + opt(right - 1, " ok", "정답 ");
     n.x.forEach(function (v, k) {
-      if (k + 1 !== q.mine) rest += '<li' + (k + 1 === right ? ' class="ok"' : "") + "><b>" + CIRCLED[k] + "</b><span>" + tx(v) + "</span></li>";
+      if (k + 1 !== q.mine && k + 1 !== right) { rest += opt(k, "", ""); nRest++; }
     });
-    return '<div class="wq-note">' +
-      '<div class="wq-sec wq-key"><h4>꼭 알아야 할 것</h4><ul>' + key + "</ul></div>" +
-      '<div class="wq-sec wq-why"><h4>왜 ' + CIRCLED[right - 1] + "번이 정답인가</h4>" + why + "</div>" +
-      (q.mine ? '<div class="wq-sec wq-miss"><h4>내가 고른 ' + CIRCLED[q.mine - 1] + "번은 왜 틀렸나</h4><p>" + miss + "</p></div>" : "") +
-      '<details class="wq-rest"><summary>' + (q.mine ? "나머지 보기 풀이" : "보기별 풀이") + '</summary><ul>' + rest + "</ul></details></div>";
+    return '<div class="wq-note"><div class="wq-opts">' + top +
+      '<details class="wq-rest"><summary>나머지 보기 ' + nRest + "개</summary>" + rest + "</details></div>" +
+      '<p class="wq-why"><span class="wq-lab">풀이</span>' + tx(n.a) + "</p>" +
+      '<div class="wq-key"><h4>꼭 알아야 할 것</h4><ul>' + n.k.map(function (v) { return "<li>" + tx(v) + "</li>"; }).join("") + "</ul></div></div>";
   }
   function wrongCardHtml(q) {
     return '<div class="wq-card">' + wrongRowHtml(q) + examNoteHtml(q) + "</div>";
@@ -1124,7 +1130,7 @@
       if (nq) {
         html += '<div class="range-jump wq-view"><button type="button" class="mini' + (wrongView === "key" ? " active" : "") + '" data-wview="key">필수 개념·풀이만</button>' +
           '<button type="button" class="mini' + (wrongView === "lines" ? " active" : "") + '" data-wview="lines">필기 줄까지</button></div>' +
-          '<p class="range-empty">틀린 문제마다 꼭 알아야 할 것, 왜 그 답인지, 내가 고른 보기가 왜 틀렸는지를 적어 놓았습니다. "문제 보기"는 이 기기에 그 회차 문제지가 있을 때 나옵니다.</p>';
+          '<p class="range-empty">틀린 문제마다 내가 고른 보기와 정답이 각각 무엇인지, 왜 그 답인지, 꼭 알아야 할 것을 적어 놓았습니다. "문제 보기"는 이 기기에 그 회차 문제지가 있을 때 나옵니다.</p>';
       } else html += '<p class="range-empty">틀린 문제가 없습니다.</p>';
       html += g.order.map(function (id, k) {
         var x = TOPICS[topicIndex(id)], grp = g.by[id], show = wrongShowOf(id, grp);
