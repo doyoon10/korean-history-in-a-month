@@ -735,6 +735,10 @@ html.theme-vt::view-transition-new(root){animation-name:theme-fade-in}
 .wq-key li+li{margin-top:4px}
 @media (max-width:480px){.wq-card{padding:2px 12px 13px}.wq-opt{gap:8px;padding:8px 10px}.wq-opt.no .wq-badge,.wq-opt.ok .wq-badge{min-width:52px;padding:0 7px}}
 .wq-view{margin-top:10px}
+.wq-view .wq-open{margin-left:auto}
+.exp-note{margin:8px 0 0}
+.mock-wrong-card .card-head{margin-bottom:6px}
+.mock-wrong-card .exp-note{margin:0 0 8px}
 .fin-sum{padding:14px 16px}
 .fin-sum-top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
 .fin-sum-top b{color:var(--ink);font-size:16px;letter-spacing:-.3px}
@@ -883,7 +887,7 @@ main:has(#view-mock.active #mock-run:not(.hidden)){max-width:1400px;padding-left
 .qv-nav .mini:disabled{opacity:.35}
 .qv-num{font-weight:800;font-size:15px;font-variant-numeric:tabular-nums}
 .crop-box{background:#fff;border-radius:6px;box-shadow:0 0 0 1px var(--line);margin:0 0 10px;padding:6px;min-height:80px;display:flex;justify-content:center;position:relative}
-.crop-box canvas{display:block;max-width:100%;height:auto}
+.crop-box canvas,.crop-box img{display:block;max-width:100%;height:auto}
 .crop-box.loading::after{content:"불러오는 중…";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#777;font-size:13px}
 .crop-box .mock-note{color:#555;padding:8px}
 .paper-empty{margin:auto;padding:30px 24px;text-align:center;max-width:420px}

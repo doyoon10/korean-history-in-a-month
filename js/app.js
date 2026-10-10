@@ -934,6 +934,8 @@
   // 기출 오답 보기: 실전 기출에서 틀린 문항과 이어진 줄만 모아 보여 준다
   // wrongView: "key"(풀이만) | "lines"(필기 줄까지). wrongShow: 주제마다 따로 펼친 상태 ("key" | "lines" | "full")
   var wrongOn = false, wrongRound = null, wrongView = "key", wrongShow = {};
+  // 문제 그림과 나머지 보기까지 모두 펼쳐 둘지 (이번에 연 동안만 기억)
+  var wrongOpenAll = false;
   var WRONG_VIEW_KEY = "hanneung_wrong_view";
 
   function topicIndex(id) {
@@ -997,6 +999,8 @@
       if (r) { wrongRound = r.dataset.wround ? +r.dataset.wround : null; renderConcept(); return; }
       var f = e.target.closest("[data-wshow]");
       if (f) { wrongShow[f.dataset.wtopic] = f.dataset.wshow; renderConcept(); jumpTo(f.dataset.wtopic); return; }
+      var o = e.target.closest("[data-wopen]");
+      if (o) { wrongOpenAll = !wrongOpenAll; renderConcept(); return; }
       var v = e.target.closest("[data-wview]");
       if (v) {
         wrongView = v.dataset.wview;
@@ -1307,7 +1311,9 @@
       }
       if (nq) {
         html += '<div class="range-jump wq-view"><button type="button" class="mini' + (wrongView === "key" ? " active" : "") + '" data-wview="key">필수 개념·풀이만</button>' +
-          '<button type="button" class="mini' + (wrongView === "lines" ? " active" : "") + '" data-wview="lines">필기 줄까지</button></div>' +
+          '<button type="button" class="mini' + (wrongView === "lines" ? " active" : "") + '" data-wview="lines">필기 줄까지</button>' +
+          '<button type="button" class="mini wq-open' + (wrongOpenAll ? " active" : "") + '" data-wopen>' + (wrongOpenAll ? "문제 접기" : "문제까지 모두 펼치기") + "</button></div>" +
+          '<p class="range-empty exp-note hidden"></p>' +
           '<p class="range-empty">틀린 문제마다 내가 고른 보기와 정답이 각각 무엇인지, 왜 그 답인지, 꼭 알아야 할 것을 적어 놓았습니다. "문제 보기"는 이 기기에 그 회차 문제지가 있을 때 나옵니다.</p>';
       } else html += '<p class="range-empty">틀린 문제가 없습니다.</p>';
       html += g.order.map(function (id, k) {
@@ -1337,6 +1343,9 @@
     host.innerHTML = html;
     $("#concept-nav").innerHTML = "";
     bindCropButtons(host);
+    // 가려진 화면에서는 그리지 않는다. 개념 정리를 열 때 다시 그려지며 펼쳐진다
+    if (wrongOpenAll && host.offsetParent) expandAll(host, function (missing) { missingNote($(".exp-note", host), missing); });
+    else host._seq = (host._seq || 0) + 1;
     renderToc();
   }
   function showWrong(round) {
@@ -2569,6 +2578,7 @@
 
   function renderMockResult(round, rec) {
     showMockPart("result");
+    openAll["res:" + round] = false;
     var ex = examByRound(round);
     var ans = rec.ans.split("").map(Number);
     var byEra = {}, wrong = [];
@@ -2610,7 +2620,8 @@
       (wrong.length ? '<button class="mini adapt-btn" id="mock-concepts">틀린 개념만 모아 보기</button>' : "") +
       '<button class="mini" id="mock-back">회차 목록</button></div></div>' +
       '<div class="card"><h2>시대별 점수</h2>' + eraRows + "</div>" +
-      '<div class="card"><h2>틀린 문제 <small>' + wrong.length + "문항</small></h2>" +
+      '<div class="card mock-wrong-card">' + (wrong.length ? expandHeadHtml("틀린 문제 <small>" + wrong.length + "문항</small>", "res:" + round)
+        : "<h2>틀린 문제 <small>0문항</small></h2>") +
       (wrong.length ? '<p class="mock-note">문제지에서 번호를 찾아 다시 보고, 헷갈린 개념은 "개념 보기"로 바로 확인하세요. 오답 노트 탭에도 모아 둡니다.</p>' + wrongRows
         : '<p class="empty">다 맞혔습니다!</p>') + "</div>";
     $("#mock-again").addEventListener("click", function () { startMock(round, true); });
@@ -2620,6 +2631,7 @@
     bindTopicButtons($("#mock-result"));
     bindCropButtons($("#mock-result"));
     bindNoteButtons($("#mock-result"));
+    bindExpandButtons($("#mock-result"));
     window.scrollTo(0, 0);
   }
 
@@ -2646,7 +2658,8 @@
           (examNote(ex.round, i) ? '<button class="mini" data-exnote="' + ex.round + ":" + i + ":" + (ans[i] || 0) + '">풀이</button>' : "") +
           (TOPIC_ERA[tag[0]] ? '<button class="mini" data-topic="' + tag[0] + '">개념 보기</button>' : "") + "</div>";
       }
-      if (rows) out += '<div class="card mock-wrong-card"><h2>실전 기출 제' + ex.round + "회 <small>" + rec.at + " · " + rec.score + "점</small></h2>" + rows + "</div>";
+      if (rows) out += '<div class="card mock-wrong-card">' +
+        expandHeadHtml("실전 기출 제" + ex.round + "회 <small>" + rec.at + " · " + rec.score + "점</small>", "tab:" + ex.round) + rows + "</div>";
     });
     return out;
   }
@@ -2681,47 +2694,146 @@
     });
   }
 
-  // 결과·오답 노트에서 "풀이": 그 줄 아래(문제 그림이 펼쳐져 있으면 그 아래)에 풀이를 펼친다
+  // 결과·오답 노트·기출 오답 카드에서 틀린 문항 한 줄(.mock-wrong) 아래에 문제 그림과 풀이를 펼친다.
+  // 순서는 줄 → 문제 그림(.crop-box) → 풀이(.wq-note)
+  function cropOf(b) {
+    var el = b.closest(".mock-wrong").nextElementSibling;
+    return el && el.classList.contains("crop-box") ? el : null;
+  }
+  function noteOf(b) {
+    var el = cropOf(b) || b.closest(".mock-wrong");
+    el = el.nextElementSibling;
+    return el && el.classList.contains("wq-note") ? el : null;
+  }
+  function openNote(b) {
+    if (noteOf(b)) return;
+    var p = b.dataset.exnote.split(":"), box = document.createElement("div");
+    box.innerHTML = examNoteHtml({ ex: examByRound(+p[0]), i: +p[1], mine: +p[2] });
+    if (!box.firstChild) return;
+    var prev = cropOf(b) || b.closest(".mock-wrong");
+    prev.parentNode.insertBefore(box.firstChild, prev.nextSibling);
+    b.textContent = "풀이 접기";
+  }
+  function closeNote(b) {
+    var el = noteOf(b);
+    if (el) { el.remove(); b.textContent = "풀이"; }
+  }
   function bindNoteButtons(root) {
     $$("button[data-exnote]", root).forEach(function (b) {
-      b.addEventListener("click", function () {
-        var row = b.closest(".mock-wrong"), p = b.dataset.exnote.split(":"), el = row.nextElementSibling;
-        if (el && el.classList.contains("crop-box")) el = el.nextElementSibling;
-        if (el && el.classList.contains("wq-note")) { el.remove(); b.textContent = "풀이"; return; }
-        var box = document.createElement("div");
-        box.innerHTML = examNoteHtml({ ex: examByRound(+p[0]), i: +p[1], mine: +p[2] });
-        var prev = row.nextElementSibling && row.nextElementSibling.classList.contains("crop-box") ? row.nextElementSibling : row;
-        prev.parentNode.insertBefore(box.firstChild, prev.nextSibling);
-        b.textContent = "풀이 접기";
-      });
+      b.addEventListener("click", function () { if (noteOf(b)) closeNote(b); else openNote(b); });
     });
   }
 
-  // 결과·오답 노트에서 "문제 보기": 저장된 문제지에서 그 문항만 잘라 펼친다
-  function bindCropButtons(root) {
-    $$("button[data-crop]", root).forEach(function (b) {
-      b.addEventListener("click", function () {
-        var row = b.closest(".mock-wrong"), open = row.nextElementSibling;
-        if (open && open.classList.contains("crop-box")) { open.remove(); b.textContent = "문제 보기"; return; }
-        var parts = b.dataset.crop.split(":"), round = +parts[0], i = +parts[1], ex = examByRound(round);
-        var box = document.createElement("div");
-        box.className = "crop-box loading";
-        box.innerHTML = '<canvas></canvas>';
-        row.parentNode.insertBefore(box, row.nextSibling);
-        b.textContent = "접기";
-        pdfGet(round, function (blob) {
-          if (!blob) {
-            box.classList.remove("loading");
-            box.innerHTML = '<p class="mock-note">이 기기에 제' + round + "회 문제지가 없습니다. 실전 기출에서 이 회차를 열 때 문제지 PDF를 고르면 여기서도 보입니다.</p>";
-            return;
-          }
-          openMockDoc(round, blob, function (doc) {
-            if (!doc) { box.classList.remove("loading"); box.innerHTML = '<p class="mock-note">문제를 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.</p>'; return; }
-            renderCrop(doc, ex, i, box.querySelector("canvas"), function () { return Math.min(box.clientWidth - 2, 720); },
-              function () { box.classList.remove("loading"); });
-          });
+  // 문제 그림: 저장된 문제지에서 그 문항만 잘라 펼친다. 한 번 자른 그림은 주소를 기억해 두고 다시 펼칠 때 그대로 쓴다.
+  // 그린 canvas는 그림 파일로 바꾼다 (수십 장을 한꺼번에 펼치면 canvas는 메모리를 많이 쓴다)
+  var cropUrl = {};
+  function cropImg(box, c) {
+    box.classList.remove("loading");
+    box.innerHTML = '<img alt="문제 그림" src="' + c.url + '" style="width:' + c.w + '">';
+  }
+  function openCrop(b, done) {
+    if (cropOf(b)) return done && done(true);
+    var row = b.closest(".mock-wrong"), key = b.dataset.crop, parts = key.split(":"), round = +parts[0], i = +parts[1];
+    var box = document.createElement("div");
+    box.className = "crop-box loading";
+    row.parentNode.insertBefore(box, row.nextSibling);
+    b.textContent = "접기";
+    if (cropUrl[key]) { cropImg(box, cropUrl[key]); return done && done(true); }
+    box.innerHTML = "<canvas></canvas>";
+    function fail(msg) {
+      box.classList.remove("loading");
+      box.innerHTML = '<p class="mock-note">' + msg + "</p>";
+      done && done(false);
+    }
+    pdfGet(round, function (blob) {
+      if (!blob) return fail("이 기기에 제" + round + "회 문제지가 없습니다. 실전 기출에서 이 회차를 열 때 문제지 PDF를 고르면 여기서도 보입니다.");
+      openMockDoc(round, blob, function (doc) {
+        if (!doc) return fail("문제를 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.");
+        var canvas = box.querySelector("canvas");
+        renderCrop(doc, examByRound(round), i, canvas, function () { return Math.max(240, Math.min(box.clientWidth - 2, 720)); }, function (ok) {
+          if (!ok) return fail("문제를 그리지 못했습니다. 다시 눌러 보세요.");
+          box.classList.remove("loading");
+          if (canvas.toBlob) canvas.toBlob(function (jpg) {
+            if (!jpg) return;
+            cropUrl[key] = { url: URL.createObjectURL(jpg), w: canvas.style.width };
+            if (canvas.parentNode === box) cropImg(box, cropUrl[key]);
+          }, "image/jpeg", 0.92);
+          done && done(true);
         });
       });
+    });
+  }
+  function closeCrop(b) {
+    var el = cropOf(b);
+    if (el) { el.remove(); b.textContent = "문제 보기"; }
+  }
+  function bindCropButtons(root) {
+    $$("button[data-crop]", root).forEach(function (b) {
+      b.addEventListener("click", function () { if (cropOf(b)) closeCrop(b); else openCrop(b); });
+    });
+  }
+
+  // 한꺼번에 펼치기: root 안의 틀린 문항마다 풀이, 나머지 보기, 문제 그림을 모두 편다.
+  // 문제 그림은 회차·번호 순으로 한 장씩 그린다 (문제지를 회차마다 한 번만 열고, 쪽도 차례로 그리게).
+  // 문제지가 이 기기에 없는 회차는 건너뛰고 after(없는 회차 목록)로 알린다
+  function expandAll(root, after) {
+    var seq = root._seq = (root._seq || 0) + 1;
+    $$("button[data-exnote]", root).forEach(openNote);
+    $$("details.wq-rest", root).forEach(function (d) { d.open = true; });
+    pdfKeys(function (keys) {
+      if (root._seq !== seq) return;
+      var have = {}, missing = [], list = [];
+      keys.forEach(function (k) { have[k] = true; });
+      $$("button[data-crop]", root).forEach(function (b) {
+        var r = b.dataset.crop.split(":")[0];
+        if (!have[r]) { if (missing.indexOf(r) === -1) missing.push(r); }
+        else if (!cropOf(b)) list.push(b);
+      });
+      list.sort(function (x, y) {
+        var p = x.dataset.crop.split(":"), q = y.dataset.crop.split(":");
+        return p[0] - q[0] || p[1] - q[1];
+      });
+      after && after(missing.sort());
+      (function next() {
+        if (root._seq !== seq || !list.length) return;
+        var b = list.shift();
+        if (document.body.contains(b)) openCrop(b, next); else next();
+      })();
+    });
+  }
+  function collapseAll(root) {
+    root._seq = (root._seq || 0) + 1;
+    $$("button[data-crop]", root).forEach(closeCrop);
+    $$("button[data-exnote]", root).forEach(closeNote);
+    $$("details.wq-rest", root).forEach(function (d) { d.open = false; });
+  }
+  function missingNote(el, missing) {
+    if (!el) return;
+    el.classList.toggle("hidden", !missing.length);
+    el.textContent = missing.length ? "제" + missing.join("·") + "회 문제지가 이 기기에 없어 문제 그림은 펼치지 못했습니다. 실전 기출에서 그 회차를 열고 문제지 PDF를 고르면 여기서도 보입니다." : "";
+  }
+  // 카드 머리의 "모두 펼치기" 버튼. 켜 둔 카드는 openAll에 적어 두어, 화면을 다시 그려도 펼친 채로 둔다
+  var openAll = {};
+  function expandHeadHtml(title, key) {
+    return '<div class="card-head"><h2>' + title + '</h2><button class="mini" type="button" data-expand="' + key + '"></button></div>' +
+      '<p class="mock-note exp-note hidden"></p>';
+  }
+  function bindExpandButtons(root) {
+    $$("button[data-expand]", root).forEach(function (b) {
+      var card = b.closest(".card"), key = b.dataset.expand;
+      function paint() {
+        b.textContent = openAll[key] ? "모두 접기" : "문제·풀이 모두 펼치기";
+        b.classList.toggle("active", !!openAll[key]);
+      }
+      function apply() {
+        var note = $(".exp-note", card);
+        if (openAll[key]) expandAll(card, function (missing) { missingNote(note, missing); });
+        else { collapseAll(card); missingNote(note, []); }
+      }
+      b.addEventListener("click", function () { openAll[key] = !openAll[key]; paint(); apply(); });
+      paint();
+      // 가려진 화면에서는 폭을 잴 수 없어 그리지 않는다. 그 화면을 열 때 다시 그려지며 펼쳐진다
+      if (openAll[key] && card.offsetParent) apply();
     });
   }
 
@@ -2738,7 +2850,7 @@
     if (!S.wrong.length) {
       host.innerHTML = mockHtml + '<p class="empty">' + (mockHtml ? "연습 문제 오답은 아직 없습니다." :
         "아직 오답이 없습니다. 문제를 풀면 틀린 문항이 여기 쌓입니다.") + "</p>";
-      bindTopicButtons(host); bindCropButtons(host); bindNoteButtons(host);
+      bindTopicButtons(host); bindCropButtons(host); bindNoteButtons(host); bindExpandButtons(host);
       return;
     }
     host.innerHTML = mockHtml + (mockHtml ? '<h2 class="wrong-sub">연습 문제 오답</h2>' : "") + S.wrong.map(function (w) {
@@ -2752,7 +2864,7 @@
         '<div class="wrong-mine">내 답 ' + (w.mine + 1) + "번 · " + esc(q.choices[w.mine]) + "</div>" +
         '<div class="wrong-ex">' + linkTerms(esc(q.explain), q.era, {}) + '<div class="ex-kw" style="margin-top:6px;font-size:12px">핵심어 · ' + esc(q.keyword) + "</div></div></div>";
     }).join("");
-    bindTopicButtons(host); bindCropButtons(host); bindNoteButtons(host);
+    bindTopicButtons(host); bindCropButtons(host); bindNoteButtons(host); bindExpandButtons(host);
   }
 
   function initWrong() {
