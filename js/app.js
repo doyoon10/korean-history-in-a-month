@@ -1319,20 +1319,22 @@
   function examNoteHtml(q) {
     var n = examNote(q.ex.round, q.i);
     if (!n) return "";
-    var era = tagEra(q.ex.tags[q.i]), seen = {}, right = +q.ex.ans[q.i], rest = "", nRest = 0;
-    function tx(v) { return linkTerms(fmt(v), era, seen); }
+    var era = tagEra(q.ex.tags[q.i]), seen = {}, seenAll = {}, right = +q.ex.ans[q.i];
+    function tx(v, sn) { return linkTerms(fmt(v), era, sn || seen); }
     // 보기 풀이 "무엇 → 누구·언제"는 화살표 뒤(정체)를 굵게 한다. 화살표가 하나일 때만
-    function opt(k, cls, label) {
+    function opt(k, cls, label, sn) {
       var p = n.x[k].split(" → ");
       return '<div class="wq-opt' + cls + '"><span class="wq-badge">' + label + CIRCLED[k] + '</span><span class="wq-opt-t">' +
-        (p.length === 2 ? tx(p[0]) + '<i class="wq-to">→</i><b>' + tx(p[1]) + "</b>" : tx(n.x[k])) + "</span></div>";
+        (p.length === 2 ? tx(p[0], sn) + '<i class="wq-to">→</i><b>' + tx(p[1], sn) + "</b>" : tx(n.x[k], sn)) + "</span></div>";
     }
+    // 접혀 있을 때는 내 답과 정답 두 줄만, 펼치면 ①~⑤ 다섯 줄을 번호 순서대로 보여 준다 (내 답은 빨강, 정답은 초록).
+    // 펼친 동안 위의 두 줄은 숨긴다 (style.css의 .wq-opts:has(.wq-rest[open]))
     var top = (q.mine ? opt(q.mine - 1, " no", "내 답 ") : "") + opt(right - 1, " ok", "정답 ");
-    n.x.forEach(function (v, k) {
-      if (k + 1 !== q.mine && k + 1 !== right) { rest += opt(k, "", ""); nRest++; }
-    });
+    var all = n.x.map(function (v, k) {
+      return k + 1 === right ? opt(k, " ok", "정답 ", seenAll) : k + 1 === q.mine ? opt(k, " no", "내 답 ", seenAll) : opt(k, "", "", seenAll);
+    }).join("");
     return '<div class="wq-note"><div class="wq-opts">' + top +
-      '<details class="wq-rest"><summary>나머지 보기 ' + nRest + "개</summary>" + rest + "</details></div>" +
+      '<details class="wq-rest"><summary>보기 5개 모두 보기</summary>' + all + "</details></div>" +
       '<p class="wq-why"><span class="wq-lab">풀이</span>' + tx(n.a) + "</p>" +
       '<div class="wq-key"><h4>꼭 알아야 할 것</h4><ul>' + n.k.map(function (v) { return "<li>" + tx(v) + "</li>"; }).join("") + "</ul></div></div>";
   }
