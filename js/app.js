@@ -2811,10 +2811,12 @@
     });
     $$("[data-wl-check]", root).forEach(function (b) {
       b.addEventListener("click", function () {
-        var key = b.dataset.wlCheck, on = !mockSeenOn(key);
+        var key = b.dataset.wlCheck, on = !mockSeenOn(key), row = b.closest(".wl-row");
         if (on) mockMark("mockSeen")[key] = true; else delete mockMark("mockSeen")[key];
         save();
-        paintSeen(b.closest(".wl-row"), on);
+        paintSeen(row, on);
+        // 다 본 문항은 펼쳐 둔 문제와 풀이를 접는다
+        if (on) { closeCrop(row); closeNote(row); }
       });
     });
     $$("[data-wl-del]", root).forEach(function (b) {
