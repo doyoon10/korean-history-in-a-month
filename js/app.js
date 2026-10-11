@@ -983,8 +983,8 @@
   // 기출 오답 보기: 실전 기출에서 틀린 문항과 이어진 줄만 모아 보여 준다
   // wrongView: "key"(풀이만) | "lines"(필기 줄까지). wrongShow: 주제마다 따로 펼친 상태 ("key" | "lines" | "full")
   var wrongOn = false, wrongRound = null, wrongView = "key", wrongShow = {};
-  // 문제 그림과 나머지 보기까지 모두 펼쳐 둘지 (이번에 연 동안만 기억)
-  var wrongOpenAll = false;
+  // 카드마다 문제 그림을 같이 볼지(wrongOpenAll), 보기 다섯 개를 다 펼쳐 둘지(wrongRestAll). 이번에 연 동안만 기억한다
+  var wrongOpenAll = false, wrongRestAll = false;
   var WRONG_VIEW_KEY = "hanneung_wrong_view";
 
   function topicIndex(id) {
@@ -1050,6 +1050,7 @@
       if (f) { wrongShow[f.dataset.wtopic] = f.dataset.wshow; renderConcept(); jumpTo(f.dataset.wtopic); return; }
       var o = e.target.closest("[data-wopen]");
       if (o) { wrongOpenAll = !wrongOpenAll; renderConcept(); return; }
+      if (e.target.closest("[data-wrest]")) { wrongRestAll = !wrongRestAll; renderConcept(); return; }
       var v = e.target.closest("[data-wview]");
       if (v) {
         wrongView = v.dataset.wview;
@@ -1401,26 +1402,29 @@
     g.order.forEach(function (id) { nq += g.by[id].qs.length; });
     $("#concept-crumb").innerHTML = "기출 오답" + " <span>" + (nq ? nq + "문항 · " + g.order.length + "개 주제" : "") + "</span>";
     $("#toc-current").textContent = "기출 오답 개념";
-    var html = '<h2 class="topic-title range-title">실전 기출에서 틀린 개념</h2>';
+    var html = "";
     if (!rounds.length) {
-      html += '<p class="range-empty">아직 채점한 실전 기출이 없습니다. 한 회를 풀고 제출하면, 틀린 문제마다 꼭 알아야 할 것과 풀이가 여기에 모입니다.</p>' +
+      html += '<h2 class="topic-title range-title">실전 기출에서 틀린 개념</h2>' +
+        '<p class="range-empty">아직 채점한 실전 기출이 없습니다. 한 회를 풀고 제출하면, 틀린 문제마다 꼭 알아야 할 것과 풀이가 여기에 모입니다.</p>' +
         '<button type="button" class="mini" data-wgo="mock">실전 기출 풀러 가기</button>';
     } else {
-      if (rounds.length > 1) {
-        html += '<div class="range-jump"><button type="button" class="mini' + (wrongRound ? "" : " active") + '" data-wround="">전체</button>' +
-          rounds.map(function (ex) {
-            var h = M.hist[ex.round];
-            return '<button type="button" class="mini' + (wrongRound === ex.round ? " active" : "") + '" data-wround="' + ex.round + '">' +
-              ex.round + "회 <small>" + h[h.length - 1].score + "점</small></button>";
-          }).join("") + "</div>";
+      // 고르는 것은 한 상자에 모은다. 회차는 하나만 고르고, 함께 보기는 켜고 끄는 단추다 (카드에는 풀이가 늘 보인다)
+      function chip(on, attr, label) {
+        return '<button type="button" class="mini' + (on ? " active" : "") + '" ' + attr + ' aria-pressed="' + !!on + '">' + label + "</button>";
       }
-      if (nq) {
-        html += '<div class="range-jump wq-view"><button type="button" class="mini' + (wrongView === "key" ? " active" : "") + '" data-wview="key">필수 개념·풀이만</button>' +
-          '<button type="button" class="mini' + (wrongView === "lines" ? " active" : "") + '" data-wview="lines">필기 줄까지</button>' +
-          '<button type="button" class="mini wq-open' + (wrongOpenAll ? " active" : "") + '" data-wopen>' + (wrongOpenAll ? "문제 접기" : "문제까지 모두 펼치기") + "</button></div>" +
-          '<p class="range-empty exp-note hidden"></p>' +
-          '<p class="range-empty">틀린 문제마다 내가 고른 보기와 정답이 각각 무엇인지, 왜 그 답인지, 꼭 알아야 할 것을 적어 놓았습니다. "문제 보기"는 이 기기에 그 회차 문제지가 있을 때 나옵니다.</p>';
-      } else html += '<p class="range-empty">틀린 문제가 없습니다.</p>';
+      html += '<div class="wq-bar">' +
+        (rounds.length > 1 ? '<div class="wq-bar-row"><span class="wq-bar-lab">회차</span><div class="wq-chips">' +
+          chip(!wrongRound, 'data-wround=""', "전체") +
+          rounds.slice().sort(function (p, q) { return p.round - q.round; }).map(function (ex) {
+            var h = M.hist[ex.round];
+            return chip(wrongRound === ex.round, 'data-wround="' + ex.round + '"', ex.round + "회 <small>" + h[h.length - 1].score + "점</small>");
+          }).join("") + "</div></div>" : "") +
+        (nq ? '<div class="wq-bar-row"><span class="wq-bar-lab">함께 보기</span><div class="wq-chips">' +
+          chip(wrongOpenAll, "data-wopen", "문제 그림") +
+          chip(wrongRestAll, "data-wrest", "보기 5개") +
+          chip(wrongView === "lines", 'data-wview="' + (wrongView === "lines" ? "key" : "lines") + '"', "필기 줄") + "</div></div>" : "") +
+        "</div>" + '<p class="range-empty exp-note hidden"></p>' +
+        (nq ? "" : '<p class="range-empty">틀린 문제가 없습니다.</p>');
       html += g.order.map(function (id, k) {
         var x = TOPICS[topicIndex(id)], grp = g.by[id], show = wrongShowOf(id, grp);
         var head = '<div class="range-head"><span class="range-num">' + (k + 1) + "</span>" +
@@ -1446,7 +1450,10 @@
     $("#concept-nav").innerHTML = "";
     bindCropButtons(host);
     // 가려진 화면에서는 그리지 않는다. 개념 정리를 열 때 다시 그려지며 펼쳐진다
-    if (wrongOpenAll && host.offsetParent) expandAll(host, function (missing) { missingNote($(".exp-note", host), missing); });
+    // 필기 줄이 하나도 안 보일 때는 필기용 단추(괄호, 빈칸 모드, 풀이 펼치기)를 숨긴다
+    $(".reader-main").classList.toggle("no-notes", !$(".points li", host));
+    if (wrongRestAll) $$("details.wq-rest", host).forEach(function (d) { d.open = true; });
+    if (wrongOpenAll && host.offsetParent) expandAll(host, function (missing) { missingNote($(".exp-note", host), missing); }, true);
     else host._seq = (host._seq || 0) + 1;
     renderToc();
   }
@@ -1462,6 +1469,7 @@
 
   function renderConcept() {
     paintModes();
+    $(".reader-main").classList.remove("no-notes");
     if (wrongOn) return renderWrongConcepts();
     if (rangeDay != null) return renderRange();
     var i = topicIndex(conceptCur);
@@ -2967,10 +2975,12 @@
   // 한꺼번에 펼치기: root 안의 틀린 문항마다 풀이, 나머지 보기, 문제 그림을 모두 편다.
   // 문제 그림은 회차·번호 순으로 한 장씩 그린다 (문제지를 회차마다 한 번만 열고, 쪽도 차례로 그리게).
   // 문제지가 이 기기에 없는 회차는 건너뛰고 after(없는 회차 목록)로 알린다
-  function expandAll(root, after) {
+  function expandAll(root, after, imagesOnly) {
     var seq = root._seq = (root._seq || 0) + 1;
-    $$("[data-exnote]", root).forEach(openNote);
-    $$("details.wq-rest", root).forEach(function (d) { d.open = true; });
+    if (!imagesOnly) {
+      $$("[data-exnote]", root).forEach(openNote);
+      $$("details.wq-rest", root).forEach(function (d) { d.open = true; });
+    }
     pdfKeys(function (keys) {
       if (root._seq !== seq) return;
       var have = {}, missing = [], list = [];
