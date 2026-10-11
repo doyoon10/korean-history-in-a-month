@@ -769,6 +769,7 @@ html.theme-vt::view-transition-new(root){animation-name:theme-fade-in}
 .exp-note{margin:8px 0 0}
 .mock-wrong-card .card-head{margin-bottom:6px}
 .mock-wrong-card .card-head .mini{flex:none;white-space:nowrap}
+.card-head-btns{display:flex;gap:6px;flex:none}
 .mock-wrong-card .exp-note{margin:0 0 8px}
 .wl-row{cursor:pointer;margin:0 -8px;padding:9px 8px}
 .wl-row:hover,.wl-row.open{background:var(--surface-2)}

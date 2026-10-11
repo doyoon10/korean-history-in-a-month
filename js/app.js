@@ -2767,14 +2767,14 @@
       }
       if (!rows) { if (hid) cleared.push(ex.round); return; }
       cards += '<div class="card mock-wrong-card">' +
-        expandHeadHtml("실전 기출 제" + ex.round + "회 <small>" + rec.at + " · " + rec.score + "점</small>", "tab:" + ex.round) + rows +
+        expandHeadHtml("실전 기출 제" + ex.round + "회 <small>" + rec.at + " · " + rec.score + "점</small>", "tab:" + ex.round,
+          '<button class="mini danger" type="button" data-wl-clear="round:' + ex.round + '" aria-label="제' + ex.round + '회 오답 비우기">비우기</button>') + rows +
         (hid ? '<p class="wl-hid">지운 문항 ' + hid + '개 <button class="mini" type="button" data-wl-restore="' + ex.round + '">되돌리기</button></p>' : "") + "</div>";
     });
     if (!cards && !cleared.length) return "";
     return wrongSecHtml("실전 기출 오답", n, "mock", "기출 오답 비우기") + cards +
-      (cleared.length ? '<p class="wl-cleared">' + (cards ? "" : "기출 오답을 모두 지웠습니다. ") + "다 지운 회차 " +
-        cleared.map(function (r) { return r + "회"; }).join(", ") +
-        ' <button class="mini" type="button" data-wl-restore="' + cleared.join(",") + '">되돌리기</button></p>' : "");
+      (cleared.length ? '<p class="wl-cleared">' + (cards ? "" : "기출 오답을 모두 지웠습니다. ") + "다 지운 회차" +
+        cleared.map(function (r) { return ' <button class="mini" type="button" data-wl-restore="' + r + '">' + r + "회 되돌리기</button>"; }).join("") + "</p>" : "");
   }
 
   function initMock() {
@@ -2963,8 +2963,10 @@
             done();
           }, { yes: "비우기", danger: true });
         }
-        var keys = mockWrongItems(null).map(function (q) { return q.ex.round + ":" + q.i; });
-        ask("실전 기출 오답 " + keys.length + "문항을 모두 지울까요?\n점수 기록과 연습 문제 오답은 그대로 남고, '되돌리기'로 다시 볼 수 있습니다.", function () {
+        var one = b.dataset.wlClear.indexOf("round:") === 0 ? +b.dataset.wlClear.slice(6) : null;
+        var keys = mockWrongItems(one).map(function (q) { return q.ex.round + ":" + q.i; });
+        ask((one ? "실전 기출 제" + one + "회 오답 " + keys.length + "문항을 지울까요?" : "실전 기출 오답 " + keys.length + "문항을 모두 지울까요?") +
+          "\n점수 기록" + (one ? "과 다른 회차 오답" : "과 연습 문제 오답") + "은 그대로 남고, '되돌리기'로 다시 볼 수 있습니다.", function () {
           keys.forEach(function (k) { mockMark("mockHide")[k] = true; });
           done();
         }, { yes: "비우기", danger: true });
@@ -3015,8 +3017,10 @@
   }
   // 카드 머리의 "모두 펼치기" 버튼. 켜 둔 카드는 openAll에 적어 두어, 화면을 다시 그려도 펼친 채로 둔다
   var openAll = {};
-  function expandHeadHtml(title, key) {
-    return '<div class="card-head"><h2>' + title + '</h2><button class="mini" type="button" data-expand="' + key + '"></button></div>' +
+  // extra: "모두 펼치기" 옆에 더 둘 단추 (오답 노트의 회차 카드는 그 회차만 비우는 단추를 둔다)
+  function expandHeadHtml(title, key, extra) {
+    return '<div class="card-head"><h2>' + title + '</h2><span class="card-head-btns">' +
+      '<button class="mini" type="button" data-expand="' + key + '"></button>' + (extra || "") + "</span></div>" +
       '<p class="mock-note exp-note hidden"></p>';
   }
   function bindExpandButtons(root) {
