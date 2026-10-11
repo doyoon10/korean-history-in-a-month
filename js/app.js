@@ -309,6 +309,7 @@
     renderToday();
     renderProgress();
     renderAccuracy();
+    renderData();
   }
 
   // 진도 기준: 현재 코스에서 아직 체크하지 않은 가장 이른 날
@@ -820,6 +821,7 @@
       b.addEventListener("click", function () {
         var era = b.dataset.reset;
         ask(ERA_NAMES[era] + " 기록을 지울까요?\n정답률, 푼 문항, 이 시대의 오답 노트가 함께 지워집니다.", function () {
+          keepUndo(ERA_NAMES[era] + " 기록을 지우기 전");
           resetEra(era);
           renderDash(); renderWrong();
         }, { yes: "지우기", danger: true });
@@ -838,13 +840,88 @@
     save();
   }
 
+  // ---------- 기록 백업 ----------
+  // 기록은 이 브라우저에만 있어서, 지우면 끝이다. 그래서 세 가지를 둔다.
+  // 내보내기: 지금 기록을 JSON 파일로 내려받는다. 가져오기: 그 파일(또는 기록 원본 JSON)로 지금 기록을 바꾼다.
+  // 되돌리기: 기록을 지우거나 통째로 바꾸기 직전의 것을 UNDO_KEY에 하나 남겨 두었다가 되살린다
+  var UNDO_KEY = "hanneung_undo";
+  function keepUndo(why) {
+    try { localStorage.setItem(UNDO_KEY, JSON.stringify({ at: new Date().toISOString(), why: why, state: S })); } catch (e) {}
+  }
+  function readUndo() {
+    try { var u = JSON.parse(localStorage.getItem(UNDO_KEY) || "null"); return u && validState(u.state) ? u : null; } catch (e) { return null; }
+  }
+  function validState(d) {
+    return !!d && typeof d === "object" && !!d.seen && typeof d.seen === "object" && Array.isArray(d.wrong) &&
+      !!d.done && typeof d.done === "object" && !!d.stats && typeof d.stats === "object";
+  }
+  function stateSummary(d) {
+    var hist = (d.mock || {}).hist || {};
+    var rounds = Object.keys(hist).filter(function (r) { return hist[r] && hist[r].length; });
+    return "푼 문제 " + Object.keys(d.seen).length + "개 · 오답 " + d.wrong.length + "개 · 실전 기출 " +
+      (rounds.length ? rounds.map(function (r) { return r + "회 " + hist[r][hist[r].length - 1].score + "점"; }).join(", ") : "없음");
+  }
+  // 기록을 통째로 바꾼다. 바꾸기 전 것은 되돌릴 수 있게 남기고, 화면은 새로 연다 (곳곳의 표시를 한 번에 맞추려고)
+  function replaceState(d, why) {
+    keepUndo(why);
+    S = d;
+    save();
+    location.reload();
+  }
+  function exportState() {
+    var blob = new Blob([JSON.stringify({ app: "hanneung", v: 1, at: new Date().toISOString(), state: S })], { type: "application/json" });
+    var a = document.createElement("a"), url = URL.createObjectURL(blob);
+    a.href = url;
+    a.download = "한능검-기록-" + todayStr() + ".json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+  }
+  function importState(file) {
+    var fr = new FileReader();
+    fr.onerror = function () { notice("파일을 읽지 못했습니다."); };
+    fr.onload = function () {
+      var d = null;
+      try { d = JSON.parse(fr.result); } catch (e) {}
+      if (d && d.app === "hanneung" && d.state) d = d.state;   // 내보낸 파일은 한 겹 싸여 있다
+      if (!validState(d)) return notice("이 사이트의 기록 파일이 아닙니다.\n'파일로 저장'으로 받은 .json 파일을 골라 주세요.");
+      ask("이 파일의 기록으로 바꿀까요?\n파일: " + stateSummary(d) + "\n지금: " + stateSummary(S) + "\n지금 기록은 '되돌리기'로 한 번 되살릴 수 있게 남겨 둡니다.",
+        function () { replaceState(d, "파일에서 가져오기 전"); }, { yes: "바꾸기" });
+    };
+    fr.readAsText(file);
+  }
+  function renderData() {
+    var u = readUndo(), b = $("#data-undo");
+    b.classList.toggle("hidden", !u);
+    if (u) {
+      var t = new Date(u.at);
+      b.textContent = "되돌리기 · " + (t.getMonth() + 1) + "." + t.getDate() + " " + pad(t.getHours()) + ":" + pad(t.getMinutes()) + " " + u.why;
+    }
+    $("#data-now").textContent = stateSummary(S);
+  }
+
   function initReset() {
     $("#acc-reset-all").addEventListener("click", function () {
-      ask("모든 학습 기록을 지울까요?\n플랜 체크, 정답률, 오답 노트가 전부 사라집니다.", function () {
+      ask("모든 학습 기록을 지울까요?\n플랜 체크, 정답률, 오답 노트, 실전 기출 점수가 전부 사라집니다.\n지운 뒤에는 이 자리의 '되돌리기'로 한 번 되살릴 수 있습니다.", function () {
+        keepUndo("전체 초기화 전");
         S = { done: {}, stats: {}, wrong: [], seen: {}, course: S.course, mastery: {}, review: {}, adaptV: 1 };
         save();
         renderDash(); renderPlan(); renderWrong();
       }, { yes: "모두 지우기", danger: true });
+    });
+    $("#data-export").addEventListener("click", exportState);
+    $("#data-import").addEventListener("click", function () { $("#data-file").click(); });
+    $("#data-file").addEventListener("change", function () {
+      var f = this.files && this.files[0];
+      this.value = "";   // 같은 파일을 다시 골라도 반응하게
+      if (f) importState(f);
+    });
+    $("#data-undo").addEventListener("click", function () {
+      var u = readUndo();
+      if (!u) return renderData();
+      ask("이 기록으로 되돌릴까요?\n되돌릴 기록: " + stateSummary(u.state) + "\n지금: " + stateSummary(S) + "\n지금 기록은 대신 남겨 두어, 다시 '되돌리기'를 누르면 돌아옵니다.",
+        function () { replaceState(u.state, "되돌리기 전"); }, { yes: "되돌리기" });
     });
   }
 

@@ -77,7 +77,6 @@
       <div class="card">
         <div class="card-head">
           <h2>시대별 정답률</h2>
-          <button class="mini danger" id="acc-reset-all">전체 기록 초기화</button>
         </div>
         <div id="accuracy-box" class="accuracy-list"></div>
       </div>
@@ -97,6 +96,19 @@
         <li><b>마지막 5일은 새 개념 금지.</b> 오답 노트와 모의고사만 도세요.</li>
       </ol>
     </details>
+
+    <div class="card data-card">
+      <h2>학습 기록 <small>이 브라우저에만 저장됩니다</small></h2>
+      <p class="data-now">지금 기록 · <span id="data-now"></span></p>
+      <p class="data-note">브라우저 기록을 지우거나 실수로 초기화하면 사라집니다. 가끔 파일로 저장해 두면 그 파일로 되살릴 수 있고, 다른 기기로 옮길 수도 있습니다.</p>
+      <div class="btn-group">
+        <button class="mini" type="button" id="data-export">파일로 저장</button>
+        <button class="mini" type="button" id="data-import">파일에서 가져오기</button>
+        <input type="file" id="data-file" accept="application/json,.json" hidden>
+        <button class="mini adapt-btn hidden" type="button" id="data-undo"></button>
+        <button class="mini danger" type="button" id="acc-reset-all">전체 기록 초기화</button>
+      </div>
+    </div>
   </section>
 
   <!-- 학습 플랜 -->
