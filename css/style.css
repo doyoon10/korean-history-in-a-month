@@ -774,6 +774,12 @@ html.theme-vt::view-transition-new(root){animation-name:theme-fade-in}
 .mock-wrong-card .card-head{margin-bottom:6px}
 .mock-wrong-card .card-head .mini{flex:none;white-space:nowrap}
 .card-head-btns{display:flex;gap:6px;flex:none}
+.fold-btn{display:flex;align-items:baseline;gap:9px;padding:2px 0;border:0;background:none;font:inherit;letter-spacing:inherit;color:inherit;text-align:left}
+.fold-btn::before{content:"";flex:none;align-self:center;width:7px;height:7px;border-right:2px solid var(--ink-soft);border-bottom:2px solid var(--ink-soft);transform:translateY(-2px) rotate(45deg);transition:transform .15s}
+.mock-wrong-card.folded .fold-btn::before{transform:translateX(-2px) rotate(-45deg)}
+.mock-wrong-card.folded>:not(.card-head){display:none}
+.mock-wrong-card.folded .card-head{margin-bottom:0}
+.mock-wrong-card.folded [data-expand]{display:none}
 .mock-wrong-card .exp-note{margin:0 0 8px}
 .wl-row{cursor:pointer;margin:0 -8px;padding:9px 8px}
 .wl-row:hover,.wl-row.open{background:var(--surface-2)}

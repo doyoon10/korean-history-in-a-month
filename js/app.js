@@ -2835,17 +2835,19 @@
     EXAMS.forEach(function (ex) {
       var hist = M.hist[ex.round];
       if (!hist || !hist.length) return;
-      var rec = hist[hist.length - 1], ans = rec.ans.split("").map(Number), rows = "", hid = 0;
+      var rec = hist[hist.length - 1], ans = rec.ans.split("").map(Number), rows = "", hid = 0, cnt = 0;
       for (var i = 0; i < 50; i++) {
         if (ans[i] === +ex.ans[i]) continue;
         if (mockHidden(ex.round + ":" + i)) { hid++; continue; }
         rows += mockRowHtml(ex, i, ans[i], { check: true });
-        n++;
+        cnt++;
       }
+      n += cnt;
       if (!rows) { if (hid) cleared.push(ex.round); return; }
-      cards += '<div class="card mock-wrong-card">' +
-        expandHeadHtml("실전 기출 제" + ex.round + "회 <small>" + rec.at + " · " + rec.score + "점</small>", "tab:" + ex.round,
-          '<button class="mini danger" type="button" data-wl-clear="round:' + ex.round + '" aria-label="제' + ex.round + '회 오답 비우기">비우기</button>') + rows +
+      cards += '<div class="card mock-wrong-card' + (wrongFold[ex.round] ? " folded" : "") + '">' +
+        expandHeadHtml("실전 기출 제" + ex.round + "회 <small>" + rec.score + "점 · " + cnt + "문항 · " + rec.at + "</small>", "tab:" + ex.round,
+          '<button class="mini danger" type="button" data-wl-clear="round:' + ex.round + '" aria-label="제' + ex.round + '회 오답 비우기">비우기</button>',
+          ex.round) + rows +
         (hid ? '<p class="wl-hid">지운 문항 ' + hid + '개 <button class="mini" type="button" data-wl-restore="' + ex.round + '">되돌리기</button></p>' : "") + "</div>";
     });
     if (!cards && !cleared.length) return "";
@@ -3003,6 +3005,15 @@
         toggleRow(row);
       });
     });
+    $$("[data-fold]", root).forEach(function (b) {
+      b.addEventListener("click", function () {
+        var k = b.dataset.fold, on = !wrongFold[k];
+        if (on) wrongFold[k] = true; else delete wrongFold[k];
+        try { localStorage.setItem(FOLD_KEY, JSON.stringify(wrongFold)); } catch (e) {}
+        b.closest(".card").classList.toggle("folded", on);
+        b.setAttribute("aria-expanded", on ? "false" : "true");
+      });
+    });
     $$("[data-wl-check]", root).forEach(function (b) {
       b.addEventListener("click", function () {
         var key = b.dataset.wlCheck, on = !mockSeenOn(key), row = b.closest(".wl-row");
@@ -3092,11 +3103,18 @@
     el.classList.toggle("hidden", !missing.length);
     el.textContent = missing.length ? "제" + missing.join("·") + "회 문제지가 이 기기에 없어 문제 그림은 펼치지 못했습니다. 실전 기출에서 그 회차를 열고 문제지 PDF를 고르면 여기서도 보입니다." : "";
   }
+  // 오답 노트에서 접어 둔 회차 카드 (회차 → true). 브라우저에 적어 두어 다시 열어도 접힌 채로 둔다
+  var FOLD_KEY = "hanneung_wrong_fold", wrongFold = {};
+  try { wrongFold = JSON.parse(localStorage.getItem(FOLD_KEY) || "{}") || {}; } catch (e) {}
   // 카드 머리의 "모두 펼치기" 버튼. 켜 둔 카드는 openAll에 적어 두어, 화면을 다시 그려도 펼친 채로 둔다
   var openAll = {};
   // extra: "모두 펼치기" 옆에 더 둘 단추 (오답 노트의 회차 카드는 그 회차만 비우는 단추를 둔다)
-  function expandHeadHtml(title, key, extra) {
-    return '<div class="card-head"><h2>' + title + '</h2><span class="card-head-btns">' +
+  // fold: 값을 주면 제목을 누를 수 있는 단추로 만들어 카드를 접고 편다 (값은 접힘 상태를 적어 둘 이름)
+  function expandHeadHtml(title, key, extra, fold) {
+    var folded = fold != null && !!wrongFold[fold];
+    return '<div class="card-head"><h2>' +
+      (fold != null ? '<button type="button" class="fold-btn" data-fold="' + fold + '" aria-expanded="' + !folded + '">' + title + "</button>" : title) +
+      '</h2><span class="card-head-btns">' +
       '<button class="mini" type="button" data-expand="' + key + '"></button>' + (extra || "") + "</span></div>" +
       '<p class="mock-note exp-note hidden"></p>';
   }
