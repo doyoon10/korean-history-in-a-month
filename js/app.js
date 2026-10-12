@@ -902,6 +902,8 @@
   }
 
   function initReset() {
+    // 비밀번호로 들어온 경우에만 '잠그기'를 보여 준다 (로그인하면 서버가 kh_in 표시를 남긴다)
+    $("#lock-link").classList.toggle("hidden", !/(?:^|;\s*)kh_in=1/.test(document.cookie));
     $("#acc-reset-all").addEventListener("click", function () {
       ask("모든 학습 기록을 지울까요?\n플랜 체크, 정답률, 오답 노트, 실전 기출 점수가 전부 사라집니다.\n지운 뒤에는 이 자리의 '되돌리기'로 한 번 되살릴 수 있습니다.", function () {
         keepUndo("전체 초기화 전");

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>한달 한국사 · 들어가기</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#8b1e2d">
+<script>try{var t=localStorage.getItem("hanneung_theme");if(t==="dark"||t==="light")document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+<style>
+/* 로그인 화면은 다른 파일 없이 혼자 뜬다 (로그인 전에는 사이트의 다른 파일을 받을 수 없다). 색은 css/style.css와 같은 값 */
+:root{--bg:#f6f5f2;--card:#fff;--ink:#1f2328;--ink-soft:#5b636d;--line:#e3e1dc;--accent:#8b1e2d;--fill:#8b1e2d;--bad:#c92a2a;--bad-bg:#fdefef;--gold:#e0a33a;--cream:#f8f6f2}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#131416;--card:#1c1e22;--ink:#e7e5e1;--ink-soft:#a1a7b0;--line:#30333a;--accent:#e06574;--fill:#8a3843;--bad:#f06a6a;--bad-bg:#3a1c1c;--gold:#c9953f;--cream:#e9e3dc}}
+:root[data-theme="dark"]{--bg:#131416;--card:#1c1e22;--ink:#e7e5e1;--ink-soft:#a1a7b0;--line:#30333a;--accent:#e06574;--fill:#8a3843;--bad:#f06a6a;--bad-bg:#3a1c1c;--gold:#c9953f;--cream:#e9e3dc}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;display:grid;place-items:center;padding:24px 16px;background:var(--bg);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Noto Sans KR",sans-serif;-webkit-font-smoothing:antialiased}
+.box{width:min(360px,100%);padding:30px 26px 24px;border-radius:18px;background:var(--card);border:1px solid var(--line);box-shadow:0 1px 2px rgba(0,0,0,.05),0 10px 30px rgba(0,0,0,.06)}
+.mark{width:52px;height:52px;display:block;margin:0 auto 14px}
+h1{margin:0;text-align:center;font-size:20px;letter-spacing:-.5px}
+.sub{margin:6px 0 22px;text-align:center;font-size:13.5px;line-height:1.6;color:var(--ink-soft)}
+label{display:block;margin-bottom:6px;font-size:12.5px;font-weight:700;color:var(--ink-soft)}
+input{width:100%;padding:12px 14px;border-radius:11px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit;font-size:16px}
+input:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:transparent}
+button{width:100%;margin-top:12px;padding:12px 14px;border:0;border-radius:11px;background:var(--fill);color:#fff;font:inherit;font-size:15px;font-weight:700;cursor:pointer}
+button:hover{filter:brightness(1.08)}
+button:disabled{opacity:.6;cursor:default;filter:none}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.err{margin:12px 0 0;padding:9px 12px;border-radius:9px;background:var(--bad-bg);color:var(--bad);font-size:13px;line-height:1.5}
+.err[hidden]{display:none}
+.foot{margin:18px 0 0;text-align:center;font-size:12px;color:var(--ink-soft)}
+</style>
+</head>
+<body>
+<main class="box">
+  <svg class="mark" viewBox="0 0 64 64" role="img" aria-label="한달 한국사 로고">
+    <rect width="64" height="64" rx="14" fill="#8b1e2d"/>
+    <circle cx="32" cy="32" r="18" fill="var(--gold)"/>
+    <path d="M 14,32 A 9,9 0 0 1 32,32 A 9,9 0 0 0 50,32 A 18,18 0 0 0 14,32 Z" fill="var(--cream)"/>
+  </svg>
+  <h1>한달 한국사</h1>
+  <p class="sub">초대받은 사람만 쓸 수 있습니다.<br>받은 비밀번호를 입력해 주세요.</p>
+  <form id="form" novalidate>
+    <label for="pw">비밀번호</label>
+    <input id="pw" name="password" type="password" autocomplete="current-password" autofocus required>
+    <button id="go" type="submit">들어가기</button>
+    <p class="err" id="err" role="alert" hidden></p>
+  </form>
+  <p class="foot">한 번 들어오면 이 기기에서는 30일 동안 다시 묻지 않습니다.</p>
+</main>
+<script>
+(function () {
+  // 로그인 뒤에 갈 곳: 이 사이트 안의 주소만 받는다
+  var next = "/";
+  try {
+    var n = new URLSearchParams(location.search).get("next") || "/";
+    if (/^\/(?!\/)/.test(n) && n.indexOf("/login.html") !== 0 && n.indexOf("/api/") !== 0) next = n;
+  } catch (e) {}
+  var form = document.getElementById("form"), pw = document.getElementById("pw"), go = document.getElementById("go"), err = document.getElementById("err");
+
+  // 잠금이 꺼져 있으면(비밀번호를 정하지 않은 경우) 이 화면을 볼 까닭이 없다
+  fetch("/api/login", { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (d) {
+    if (d && d.locked === false) location.replace(next);
+  }).catch(function () {});
+
+  function fail(msg) {
+    err.textContent = msg;
+    err.hidden = false;
+    go.disabled = false;
+    go.textContent = "들어가기";
+    pw.select();
+  }
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    if (!pw.value) return fail("비밀번호를 입력해 주세요.");
+    err.hidden = true;
+    go.disabled = true;
+    go.textContent = "확인하는 중…";
+    fetch("/api/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ password: pw.value }),
+    }).then(function (r) {
+      if (r.ok) return location.replace(next);
+      fail(r.status === 401 ? "비밀번호가 맞지 않습니다." : "지금은 확인할 수 없습니다. 잠시 뒤에 다시 해 주세요.");
+    }).catch(function () { fail("연결이 끊겼습니다. 인터넷을 확인하고 다시 해 주세요."); });
+  });
+})();
+</script>
+</body>
+</html>
