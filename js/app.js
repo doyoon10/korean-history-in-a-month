@@ -504,7 +504,7 @@
         : dleft > 0 ? "마감 " + dateLabel(end) + "까지 오늘 포함 " + (dleft + 1) + "일" : dleft === 0 ? "오늘 " + dateLabel(end) + "이 마감" : "마감 " + dateLabel(end) + "이 " + (-dleft) + "일 지남";
       var lateNote = "";
       if (lateLeft) {
-        lateNote = '<div class="late-note"><b>진도가 ' + lateLeft + "일 치 밀렸습니다.</b> 지난 날짜에 못 끝낸 몫이라 아래 목록 맨 위에 '밀림'으로 올려 두었습니다." +
+        lateNote = '<div class="late-note"><b>진도가 ' + lateLeft + "일 치 밀렸습니다.</b> 목록 맨 위에 '밀림'으로 올렸습니다." +
           '<div class="late-acts">' +
           (dleft > 0 ? '<button class="mini" id="sp-redo">남은 날에 다시 나누기</button>' : "") +
           '<button class="mini" id="sp-extend">마감 하루 늦추기</button></div></div>';
@@ -518,8 +518,8 @@
               return '<li class="sp-item"><span class="sp-day">DAY ' + p.day + '</span><span class="sp-title">' + esc(p.title) + " <small>주제 " + p.concepts.length + "</small></span>" +
                 '<button class="mini" data-sp-concept="' + p.day + '">개념</button></li>';
             }).join("") + "</ul>"
-          : '<p class="sp-peek-empty">' + (dleft > 0 ? "내일로 잡힌 몫이 없습니다. 남은 진도는 모두 오늘 몫에 들어 있습니다."
-            : "오늘이 마감이라 내일 몫이 없습니다. 오늘 다 못 하면 내일 '밀림'으로 넘어갑니다. 여유를 두려면 마감을 늦추세요.") +
+          : '<p class="sp-peek-empty">' + (dleft > 0 ? "내일로 잡힌 몫이 없습니다."
+            : "오늘이 마감이라 내일 몫이 없습니다.") +
             (dleft <= 0 ? ' <button class="mini" id="sp-extend2">마감 하루 늦추기</button>' : "") + "</p>") + "</div>";
       }
       box.innerHTML =
@@ -529,10 +529,10 @@
         '<div class="prog-row"><div class="prog-label"><span>전체 진도</span><small>' + doneDays + " / " + total + "일 치 · 남은 " + left.length + '일 치</small></div><div class="bar"><i style="width:' + pct + '%"></i></div></div>' +
         lateNote +
         (batch.length ? '<ul class="sprint-list">' + batch.map(function (p) { return sprintRow(p, lateIds.indexOf(p.day) !== -1); }).join("") + "</ul>"
-          : '<p class="sp-peek-empty">' + (notYet ? "아직 시작 전입니다. " + dateLabel(st) + "부터 하루 몫이 뜹니다. 미리 하려면 아래 '내일 진도 보기'에서 당겨 오세요."
-            : "오늘로 잡힌 몫이 없습니다. 아래에서 다음 몫을 당겨 올 수 있습니다.") + "</p>") +
-        (batch.length ? '<p class="today-note">' + (allDone ? "오늘 몫을 다 끝냈습니다. 더 할 수 있으면 내일 몫을 당겨 오세요."
-          : "한 줄씩: 개념 → 문제 10개 → 체크. 남은 주제 " + remainTopics + "개, 읽기만 약 " + (remainTopics * 8) + "분입니다.") + "</p>" : "") +
+          : '<p class="sp-peek-empty">' + (notYet ? "아직 시작 전입니다. " + dateLabel(st) + "부터 하루 몫이 뜹니다."
+            : "오늘로 잡힌 몫이 없습니다.") + "</p>") +
+        (batch.length ? '<p class="today-note">' + (allDone ? "오늘 몫을 다 끝냈습니다."
+          : "개념 → 문제 10개 → 체크 · 남은 주제 " + remainTopics + "개(읽기 약 " + (remainTopics * 8) + "분)") + "</p>" : "") +
         '<div class="today-actions">' +
         (batch.length ? '<button class="mini" id="sp-read">오늘 몫 개념 이어 보기</button>' +
           '<button class="mini" id="sp-quiz">오늘 몫 문제 20개 <small>새 ' + countUnseen({ concepts: ids }) + "</small></button>" : "") +
@@ -673,8 +673,8 @@
     if (fp.left <= 0) {
       box.innerHTML = '<div class="today-day">막판 기출 플랜</div>' +
         '<div class="today-title">' + (fp.left === 0 ? "오늘이 시험입니다" : "시험이 끝났습니다") + "</div>" +
-        '<p class="today-note">' + (fp.left === 0 ? "새로 외우지 말고 틀린 문제의 노란 상자만 한 번 훑고 들어가세요. 1·2점 문항부터 확실히 잡으면 됩니다."
-          : "수고했습니다. 다음 시험을 준비한다면 학습 플랜 탭에서 기본 플랜으로 바꾸세요.") + "</p>" +
+        '<p class="today-note">' + (fp.left === 0 ? "새로 외우지 말고 틀린 문제의 노란 상자만 훑고 들어가세요."
+          : "다음 시험을 준비한다면 학습 플랜에서 기본 플랜으로 바꾸세요.") + "</p>" +
         (fp.left === 0 && fp.taken.length ? '<div class="today-actions"><button class="mini" data-fin-wrong="">기출 오답</button></div>' : "");
       return bindFinal(box);
     }
@@ -685,8 +685,6 @@
       '<div class="prog-row"><div class="prog-label"><span>실전 기출</span><small>' + fp.taken.length + " / " + total + '회 풂</small></div>' +
       '<div class="bar"><i style="width:' + (total ? Math.round(fp.taken.length / total * 100) : 0) + '%"></i></div></div>' +
       finalTodayList(fp) +
-      '<p class="today-note">' + (d.eve ? "오늘은 점수를 올리는 날이 아니라 잊지 않는 날입니다."
-        : "푸는 시간만큼 오답 카드를 읽어야 점수가 오릅니다. 1·2점 문항만 다 맞혀도 70점입니다.") + "</p>" +
       '<div class="today-actions"><button class="mini" data-fin-view="plan">남은 일정</button><button class="mini" data-fin-view="analysis">약점 분석</button></div>';
     bindFinal(box);
   }
@@ -698,12 +696,11 @@
     var html = '<div class="card fin-sum"><div class="fin-sum-top"><b>' +
       (fp.left > 0 ? "시험까지 " + fp.left + "일" : fp.left === 0 ? "오늘이 시험입니다" : "시험이 끝났습니다") + "</b>" +
       "<span>실전 기출 " + fp.taken.length + " / " + total + "회 풂</span></div>" +
-      '<p class="sprint-ctl-note">' + (fp.left < 0 ? "다음 시험을 준비한다면 위에서 기본 플랜으로 바꾸세요."
-        : fp.left === 0 ? "새로 외우지 말고 틀린 문제의 노란 상자만 한 번 훑고 들어가세요."
-        : "하루에 기출 한 회를 풀고, 틀린 문제 카드를 읽고, 맞춤 문제로 마무리합니다. 안 푼 회차를 예전 회차부터 차례로 잡고, 다 풀면 점수가 낮았던 회차를 다시 풉니다. 시험 전날은 새 문제 없이 복습만 합니다.") + "</p>" +
+      (fp.left > 0 ? "" : '<p class="sprint-ctl-note">' + (fp.left < 0 ? "다음 시험을 준비한다면 위에서 기본 플랜으로 바꾸세요."
+        : "새로 외우지 말고 틀린 문제의 노란 상자만 훑고 들어가세요.") + "</p>") +
       (chips ? '<div class="fin-chips"><span>푼 회차 오답 보기</span>' + chips + "</div>" : "") +
-      (fp.left > 0 && fp.spare.length ? '<p class="sprint-ctl-note">남은 날보다 안 푼 회차가 ' + fp.spare.length + "개 많습니다(" +
-        fp.spare.map(function (r) { return r + "회"; }).join(", ") + "). 시간이 되는 날 한 회 더 푸세요.</p>" : "") + "</div>";
+      (fp.left > 0 && fp.spare.length ? '<p class="sprint-ctl-note">일정에 못 넣은 회차 · ' +
+        fp.spare.map(function (r) { return r + "회"; }).join(", ") + "</p>" : "") + "</div>";
     fp.days.forEach(function (d, i) {
       html += '<div class="plan-item' + (i === 0 ? " today" : "") + '"><div class="plan-body">' +
         '<div class="plan-meta"><span>' + dateLabel(d.date) + "</span>" + (i === 0 ? '<span class="badge-today">오늘</span>' : "") +
@@ -732,8 +729,7 @@
     $$("#plan-mode [data-plan-mode]").forEach(function (b) { b.classList.toggle("active", (b.dataset.planMode === "final") === fin); });
     $("#plan-course").classList.toggle("hidden", fin);
     $("#plan-title").textContent = fin ? "막판 기출 플랜" : "31일 학습 플랜";
-    $("#plan-desc").textContent = fin ? "진도를 끝낸 뒤 시험 전날까지 기출과 오답만 돌립니다. 기본 플랜과 체크 기록은 그대로 남아 있어 언제든 돌아갈 수 있습니다."
-      : "오늘 날짜에 맞춰 자동으로 하이라이트됩니다. 체크하면 진도율에 반영됩니다.";
+    $("#plan-desc").textContent = fin ? "하루에 기출 한 회 → 틀린 문제 카드 → 맞춤 문제. 기본 플랜의 체크는 그대로 남습니다." : "";
   }
   // 문제를 낼 범위: 기본 플랜은 오늘 진도까지, 막판 플랜은 전 범위
   function learnedDay() { return finalOn() ? Infinity : todayLastDay(); }
@@ -788,12 +784,7 @@
       row("학습 플랜", planDone + " / " + window.PLAN.length + "일", planPct) +
       row("문제 진도", seen + " / " + total + "문항", quizPct) +
       row("전체 정답률", ok + " / " + all + "문항", accPct) +
-      '<p style="font-size:13px;color:var(--ink-soft);margin:14px 0 0">' +
-      (accPct >= 80 ? "1급 안정권입니다. 이 페이스를 유지하세요."
-        : accPct >= 70 ? "2급 안정권. 근현대 정답률을 끌어올리면 1급이 보입니다."
-        : accPct >= 60 ? "3급 안정권. 오답 노트를 두 번씩 도세요."
-        : all === 0 ? "아직 푼 문제가 없습니다. 오늘 범위부터 10문항 풀어보세요."
-        : "개념을 한 번 더 보고 같은 범위를 반복하세요.") + "</p>";
+      (all === 0 ? '<p style="font-size:13px;color:var(--ink-soft);margin:14px 0 0">아직 푼 문제가 없습니다.</p>' : "");
 
     function row(label, sub, pct) {
       return '<div class="prog-row"><div class="prog-label"><span>' + label +
@@ -968,15 +959,15 @@
       (sprintOn() ? '<button class="mini" id="sprint-off" type="button">끄기</button>' : "") + "</div>" +
       '<p class="sprint-ctl-note">' + (sprintOn()
         ? (left.length ? "남은 진도 <b>" + left.length + "일 치</b>를 " +
-            (sprintStart() > todayStr() ? dateLabel(sprintStart()) + "부터 " : "") + dateLabel(sprintEnd()) + "까지 나눴습니다. 오늘 할 몫은 <b>" + todaySet.filter(function (d) { return !S.done[d]; }).length + "일 치</b>" +
-            (sprintLate().length ? "(밀린 " + sprintLate().length + "일 치 포함)" : "") + "이고, 아래 목록에 날짜별 몫이 표시됩니다. 시작하는 날을 지난 날짜로 고르면 그 사이 몫은 밀린 것으로 표시됩니다."
-          : "진도를 모두 끝냈습니다. 이제 실전 기출과 약점 분석만 돌리세요.")
-        : "시작하는 날과 끝나는 날을 고르면 남은 진도를 그 사이에 고르게 나눠 하루 몫을 정해 줍니다.") + "</p></div>";
+            (sprintStart() > todayStr() ? dateLabel(sprintStart()) + "부터 " : "") + dateLabel(sprintEnd()) + "까지 나눴습니다. 오늘 몫 <b>" + todaySet.filter(function (d) { return !S.done[d]; }).length + "일 치</b>" +
+            (sprintLate().length ? "(밀린 " + sprintLate().length + "일 치 포함)" : "")
+          : "진도를 모두 끝냈습니다.")
+        : "날짜를 고르면 남은 진도를 그 사이에 고르게 나눕니다.") + "</p></div>";
     if (planCourse === "core") {
       html += '<div class="card" style="padding:14px 16px;font-size:13.5px;color:var(--ink-soft)">' +
-        "3급(60점) 목표 최소 코스입니다. 배점이 크고 출제 빈도가 높은 " +
+        "3급(60점) 목표 최소 코스 · 배점이 크고 자주 나오는 " +
         window.PLAN.filter(function (p) { return p.core; }).length +
-        "일만 남겼습니다. 시간이 남으면 1급 코스로 전환하세요.</div>";
+        "일만 남겼습니다.</div>";
     }
     window.PLAN.forEach(function (p, i) {
       if (planCourse === "core" && !p.core) return;
@@ -1484,7 +1475,7 @@
     var html = "";
     if (!rounds.length) {
       html += '<h2 class="topic-title range-title">실전 기출에서 틀린 개념</h2>' +
-        '<p class="range-empty">아직 채점한 실전 기출이 없습니다. 한 회를 풀고 제출하면, 틀린 문제마다 꼭 알아야 할 것과 풀이가 여기에 모입니다.</p>' +
+        '<p class="range-empty">아직 채점한 실전 기출이 없습니다. 한 회를 풀고 제출하면 틀린 문제의 풀이가 여기에 모입니다.</p>' +
         '<button type="button" class="mini" data-wgo="mock">실전 기출 풀러 가기</button>';
     } else {
       // 고르는 것은 한 상자에 모은다. 회차는 하나만 고르고, 함께 보기는 켜고 끄는 단추다 (카드에는 풀이가 늘 보인다)
@@ -1573,7 +1564,7 @@
     $("#toc-current").textContent = "DAY " + p.day + " · " + p.title;
     var html = '<h2 class="topic-title range-title">' + esc(p.title) + "</h2>";
     if (!ids.length) {
-      html += '<p class="range-empty">이날은 새 개념 없이 복습하는 날입니다. 오답 노트와 연습 문제를 돌리고, 앞 범위는 아래 버튼으로 다시 볼 수 있습니다.</p>';
+      html += '<p class="range-empty">이날은 새 개념 없이 복습하는 날입니다.</p>';
     } else {
       if (ids.length > 1) html += '<div class="range-jump">' + ids.map(function (id, k) {
         return '<button type="button" class="mini" data-jump-topic="' + id + '"><b>' + (k + 1) + "</b> " + esc(TOPICS[topicIndex(id)].t.title) + "</button>";
@@ -2080,7 +2071,7 @@
     if (!f.ok) {
       var notes = [];
       if (f.twinAt != null) notes.push(f.twinAt - run.list.indexOf(q) <= 1 ? "다음에 같은 주제 문제가 한 번 더 나옵니다." : (f.twinAt - run.list.indexOf(q) - 1) + "문제 뒤에 같은 주제 문제가 한 번 더 나옵니다.");
-      notes.push("이 문제는 내일 복습 차례로 다시 냅니다.");
+      notes.push("내일 복습에 다시 나옵니다.");
       html += '<div class="ex-next">' + notes.join(" ") + "</div>" +
         '<button type="button" class="mini" id="q-concept">개념 다시 보기</button>';
     }
@@ -2218,18 +2209,14 @@
     var total = run.list.length;
     var score = Math.round(ok / total * 100);
     var grade = score >= 80 ? "심화 1급 수준" : score >= 70 ? "심화 2급 수준" : score >= 60 ? "심화 3급 수준" : "불합격 구간";
-    var msg = score >= 80 ? "이 페이스면 1급 충분합니다. 남은 기간은 근현대와 오답 노트에 집중하세요."
-      : score >= 70 ? "2급은 안정권입니다. 틀린 시대 개념을 한 번 더 보면 1급이 보입니다."
-      : score >= 60 ? "3급 합격선입니다. 오답 노트를 두 번 돌면 확실해집니다."
-      : "개념 탭에서 해당 시대를 다시 읽고 같은 범위를 한 번 더 푸세요.";
-
+    var msg = "";
     if (run.filter) {
       var left = countUnseen(run.filter);
-      msg += left ? " 이 범위에 아직 안 푼 문제가 " + left + "개 남았습니다. 같은 범위 다시를 누르면 그 문제부터 나옵니다."
-                  : " 이 범위의 문제를 모두 한 번씩 풀었습니다. 이제 틀렸던 문제부터 다시 나옵니다.";
+      msg = left ? "이 범위에 안 푼 문제가 " + left + "개 남았습니다."
+                 : "이 범위의 문제를 모두 한 번씩 풀었습니다.";
     }
     if (run.n > 0 && total < run.n) {
-      msg += " 이 범위에 준비된 문제는 " + total + "개입니다. 대시보드의 배운 범위 누적으로 더 풀 수 있습니다.";
+      msg += (msg ? " " : "") + "이 범위에 준비된 문제는 " + total + "개입니다.";
     }
 
     var wrongList = [];
@@ -2240,7 +2227,7 @@
     var html = '<div class="card result-hero">' +
       '<div class="result-score">' + score + "점</div>" +
       '<div class="result-grade">' + grade + " · " + ok + " / " + total + "문항</div>" +
-      '<p class="result-msg">' + msg + "</p>" +
+      (msg ? '<p class="result-msg">' + msg + "</p>" : "") +
       '<div class="result-actions">' +
       '<button class="primary" id="res-again">' + (run.adaptive ? "맞춤 10문제 더" : "같은 범위 다시") + "</button>" +
       (wrongList.length ? '<button class="mini" id="res-twins">틀린 주제만 더 풀기</button>' : "") +
@@ -2427,13 +2414,14 @@
         "</div></div>";
     }).join("");
     host.innerHTML =
-      '<div class="card mock-guide"><h2>이렇게 푸세요</h2><ol>' +
-      '<li><a href="' + EXAM_URL + '" target="_blank" rel="noopener">한국사능력검정시험 시험 자료실</a>에서 풀 회차의 <b>심화 문제지 PDF</b>를 받아 둡니다.</li>' +
-      "<li>아래에서 회차를 고르고, 화면의 <b>문제지 PDF 열기</b>로 받은 파일을 고릅니다. 한 번 고르면 이 기기에 저장되어 다음부터는 바로 열립니다.</li>" +
-      "<li><b>시작</b>을 눌러야 80분이 흐르기 시작합니다. 화면을 벗어나면 저절로 멈추고, 돌아와서 <b>계속하기</b>를 누르면 이어서 흐릅니다.</li>" +
-      "<li>문제가 한 문제씩 크게 뜹니다. 아래 ①~⑤를 누르면 답이 찍히고 다음 문제로 넘어갑니다. 키보드는 <b>1~5</b>로 답, <b>← →</b>로 이동합니다.</li>" +
-      "<li>다 풀면 <b>제출</b>을 누르세요. 공식 정답표로 채점하고, 틀린 문제는 그 자리에서 다시 볼 수 있습니다.</li></ol>" +
-      '<p class="mock-note">문제지는 국사편찬위원회 저작물이라 이 사이트에는 올리지 않습니다. 고른 PDF는 서버로 가지 않고 이 브라우저 안에서만 열립니다. 정답·배점은 공식 정답표 기준입니다.</p></div>' +
+      // 한 번이라도 풀어 본 사람에게는 접어 둔다
+      '<details class="card mock-guide fold-card"' + (Object.keys(M.hist).some(function (r) { return (M.hist[r] || []).length; }) ? "" : " open") + '><summary><h2>푸는 법</h2></summary><ol>' +
+      '<li><a href="' + EXAM_URL + '" target="_blank" rel="noopener">시험 자료실</a>에서 풀 회차의 <b>심화 문제지 PDF</b>를 받습니다.</li>' +
+      "<li>회차를 고르고 <b>문제지 PDF 열기</b>로 그 파일을 고릅니다. 한 번만 하면 됩니다.</li>" +
+      "<li><b>시작</b>을 누르면 80분이 흐릅니다. 화면을 벗어나면 멈춥니다.</li>" +
+      "<li>①~⑤를 누르면 답이 찍히고 다음 문제로 넘어갑니다. 키보드는 <b>1~5</b>, <b>← →</b>.</li>" +
+      "<li><b>제출</b>하면 바로 채점합니다.</li></ol>" +
+      '<p class="mock-note">문제지는 국사편찬위원회 저작물이라 사이트에 올리지 않습니다. 고른 PDF는 이 기기 안에서만 열립니다.</p></details>' +
       '<div class="card"><h2>회차 고르기 <small>심화</small></h2><div class="mock-rows">' + rows + "</div></div>";
 
     pdfKeys(function (keys) {
@@ -2648,8 +2636,7 @@
         host.innerHTML = '<div class="paper-empty">' +
           "<p><b>제" + round + "회 심화 문제지 PDF</b>를 열어 주세요.</p>" + pickerHtml("문제지 PDF 열기") +
           '<p class="mock-note">아직 없다면 <a href="' + EXAM_URL + '" target="_blank" rel="noopener">시험 자료실</a>에서 받으세요. ' +
-          "고른 파일은 이 기기에만 저장되고, 다음부터는 바로 열립니다.</p>" +
-          '<p class="mock-note">종이에 인쇄해서 풀어도 됩니다. 답안지와 타이머는 그대로 쓰면 됩니다.</p></div>';
+          "고른 파일은 이 기기에만 저장됩니다.</p></div>";
         bindPicker(host, round);
       }
     });
@@ -2807,7 +2794,7 @@
       '<div class="card"><h2>시대별 점수</h2>' + eraRows + "</div>" +
       '<div class="card mock-wrong-card">' + (wrong.length ? expandHeadHtml("틀린 문제 <small>" + wrong.length + "문항</small>", "res:" + round)
         : "<h2>틀린 문제 <small>0문항</small></h2>") +
-      (wrong.length ? '<p class="mock-note">줄을 누르면 문제와 풀이가 함께 펼쳐집니다. 헷갈린 개념은 "개념 보기"로 확인하세요. 오답 노트 탭에도 모아 둡니다.</p>' + wrongRows
+      (wrong.length ? '<p class="mock-note">줄을 누르면 문제와 풀이가 펼쳐집니다.</p>' + wrongRows
         : '<p class="empty">다 맞혔습니다!</p>') + "</div>";
     $("#mock-again").addEventListener("click", function () { startMock(round, true); });
     var mc = $("#mock-concepts");
@@ -3294,7 +3281,7 @@
     var n = L.rows.length, ER = L.lanes + 1;
     var html = '<section class="tl-group tl-all">' +
       '<div class="tl-head"><div><h2>한국사 전체 타임라인</h2><span class="tl-range">' +
-      yearText(L.rows[0].y) + " ~ " + yearText(L.rows[n - 1].y) + " · 사건 " + n + "칸 · 기간 " + L.bars.length + "개 · 옆으로 넘겨 보세요</span></div>" +
+      yearText(L.rows[0].y) + " ~ " + yearText(L.rows[n - 1].y) + "</span></div>" +
       '<div class="tl-nav"><button class="tl-arrow" data-dir="-1" aria-label="이전">&#8249;</button>' +
       '<button class="tl-arrow" data-dir="1" aria-label="다음">&#8250;</button></div></div>' +
       '<div class="tl-scroll" id="tl-scroll"><div class="tl-track" style="--cols:' + n + ";--lanes:" + L.lanes + '">';
@@ -3491,7 +3478,7 @@
         '<div class="ana-gaps">' + goals + "</div></div></div>";
       if (a.mocks.length > 1) html += '<p class="ana-hint">실전 기록 · ' + a.mocks.map(function (m) { return m.round + "회 " + m.score + "점"; }).join(" → ") + "</p>";
     } else {
-      html += '<p class="ana-hint">실전 기출을 한 회 풀면 지금 점수와 등급까지 남은 점수가 여기에 뜹니다.</p>' +
+      html += '<p class="ana-hint">실전 기출을 한 회 풀면 지금 점수가 여기에 뜹니다.</p>' +
         '<button type="button" class="mini" data-goto-view="mock">실전 기출 풀러 가기</button>';
     }
     html += "</div>";
@@ -3513,10 +3500,9 @@
           '<div class="ana-acts"><button type="button" class="mini" data-ana-quiz="' + e.id + '">이 시대 문제 10개</button></div></div></li>';
       }).join("") + "</ol>";
       var sum = a.ranked.slice(0, 3).reduce(function (t, e) { return t + e.gain; }, 0);
-      html += '<p class="ana-hint">이 ' + Math.min(3, a.ranked.length) + "곳만 다 맞히게 되면 최대 <b>+" + Math.round(sum) +
-        "점</b>입니다. 남은 " + left + "일 동안 플랜 진도와 함께 하루 한 곳씩 돌아가며 개념 → 문제 10개 순서로 도세요.</p>";
+      html += '<p class="ana-hint">이 ' + Math.min(3, a.ranked.length) + "곳을 다 맞히면 최대 <b>+" + Math.round(sum) + "점</b>입니다.</p>";
     } else {
-      html += '<p class="ana-hint">아직 순위를 매길 만큼 푼 문제가 없습니다. 시대마다 ' + ANA_MIN + "문항 이상 풀면 약한 곳 순위가 나옵니다.</p>";
+      html += '<p class="ana-hint">시대마다 ' + ANA_MIN + "문항 이상 풀면 약한 곳 순위가 나옵니다.</p>";
     }
     html += "</div>";
 
@@ -3537,11 +3523,11 @@
           '<button type="button" class="mini" data-ana-tquiz="' + id + '">문제 5개</button></div>';
       }).join("") + "</div>";
     } else {
-      html += '<p class="ana-hint">아직 약한 주제가 없습니다. 같은 주제를 두 번 이상 풀었는데 숙련도가 60% 아래면 여기에 뜹니다.</p>';
+      html += '<p class="ana-hint">아직 약한 주제가 없습니다.</p>';
     }
     html += '<div class="ana-review"><span>복습 일정</span><b>오늘 ' + rv.today + "</b><b>내일 " + rv.tomorrow + "</b><b>그 뒤 " + rv.later + "</b>" +
       '<button type="button" class="primary small" id="ana-adapt">맞춤 10문제 시작</button></div>' +
-      '<p class="ana-hint">틀린 문제는 1일 → 3일 → 6일 뒤에 다시 나오고, 세 번 연달아 맞히면 복습에서 빠집니다.</p></div>';
+      '<p class="ana-hint">틀린 문제는 1일 → 3일 → 6일 뒤에 다시 나옵니다.</p></div>';
 
     // 시대별 한눈에: 여지 큰 순, 데이터 부족은 아래로
     var rows = a.eras.filter(function (e) { return e.enough; }).sort(function (x, y) { return y.gain - x.gain; })

@@ -47,7 +47,7 @@
     <button class="tab" data-view="analysis" title="약점 분석"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 20.5h17M6.5 17v-5M11 17V6M15.5 17v-3M20 17V9"/></svg><span class="tab-name">약점 분석</span><span class="tab-short">분석</span></button>
     <button class="tab" data-view="timeline" title="연표·암기"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h18M7 7v2.5M12 14.5V17M17 7v2.5"/><circle cx="7" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="17" cy="12" r="1.8" fill="currentColor"/></svg><span class="tab-name">연표·암기</span><span class="tab-short">연표</span></button>
   </nav>
-  <div class="side-foot">학습 기록은 이 브라우저에만 저장됩니다.<br>문의: 26_07@bssm.hs.kr<a class="hidden" id="lock-link" href="/api/login?out=1">잠그기(로그아웃)</a></div>
+  <div class="side-foot">문의: 26_07@bssm.hs.kr<a class="hidden" id="lock-link" href="/api/login?out=1">잠그기(로그아웃)</a></div>
 </aside>
 
 <div class="page">
@@ -57,7 +57,7 @@
   <section class="view active" id="view-dash">
     <div class="view-head">
       <h1>1달 안에 심화 <b>1급</b>까지</h1>
-      <p>심화 1급 80점 · 2급 70점 · 3급 60점. 50문항 80분, 문항마다 1~3점(합계 100점). 근현대(개항기~현대)가 <b>전체의 약 40%</b>라 여기서 점수가 갈립니다.</p>
+      <p>1급 80점 · 2급 70점 · 3급 60점 · 50문항 80분 · 근현대가 <b>약 40%</b></p>
     </div>
 
     <div class="dash-top">
@@ -86,7 +86,7 @@
       </div>
     </div>
 
-    <details class="card strategy" open>
+    <details class="card strategy fold-card">
       <summary><h2>합격 전략 요약</h2></summary>
       <ol>
         <li><b>순서대로 하지 말고 비중대로.</b> 근현대(개항기·일제·현대)가 20문항 안팎입니다. 1주차에 전근대를 빠르게 훑고 2주차부터 근현대에 시간을 몰아주세요.</li>
@@ -100,7 +100,6 @@
     <div class="card data-card">
       <h2>학습 기록 <small>이 브라우저에만 저장됩니다</small></h2>
       <p class="data-now">지금 기록 · <span id="data-now"></span></p>
-      <p class="data-note">브라우저 기록을 지우거나 실수로 초기화하면 사라집니다. 가끔 파일로 저장해 두면 그 파일로 되살릴 수 있고, 다른 기기로 옮길 수도 있습니다.</p>
       <div class="btn-group">
         <button class="mini" type="button" id="data-export">파일로 저장</button>
         <button class="mini" type="button" id="data-import">파일에서 가져오기</button>
@@ -115,7 +114,7 @@
   <section class="view" id="view-plan">
     <div class="view-head">
       <h1 id="plan-title">31일 학습 플랜</h1>
-      <p id="plan-desc">오늘 날짜에 맞춰 자동으로 하이라이트됩니다. 체크하면 진도율에 반영됩니다.</p>
+      <p id="plan-desc"></p>
     </div>
     <div class="concept-modes" id="plan-mode" role="group" aria-label="플랜 종류">
       <button class="mini active" type="button" data-plan-mode="base">기본 플랜 <small>31일 진도</small></button>
@@ -132,7 +131,7 @@
   <section class="view" id="view-concept">
     <div class="view-head">
       <h1>개념 정리</h1>
-      <p><b>오늘 범위</b>는 오늘 공부할 주제를 한 화면에 이어서 보여 주고, <b>전체 주제</b>는 목차에서 고른 한 주제씩 보여 줍니다. <b>기출 오답</b>은 실전 기출에서 틀린 문제마다 꼭 알아야 할 것과 풀이(왜 그 답인지, 내가 고른 보기가 왜 틀렸는지)를 보여 줍니다. 아래 버튼이나 키보드 ← → 로 넘기세요. <b>빨간 글씨</b>가 시험에 그대로 나오는 핵심어입니다. 밑줄 단어나 <span class="note-blue">파란 ㄴ→ 단어</span>에 마우스를 올리면(휴대폰은 탭) 풀이가 뜹니다. <span class="note-blue">파란 괄호</span>는 사람·지명 같은 단서입니다. 뜻풀이와 그냥 연도 같은 괄호는 걸러 두었고, "괄호 핵심"을 누르면 빨간 핵심어에 붙은 것만 남습니다. "전부"를 누르면 걸러 낸 것도 <span class="note-gray">회색</span>으로 보입니다. "풀이 펼치기"를 누르면 괄호가 본문 제자리에 들어가 필기하는 모양 그대로 보입니다.</p>
+      <p class="legend"><b class="lg-red">빨간 글씨</b> 핵심어 · <span class="note-blue">파란 괄호</span> 단서 · <u>밑줄</u>과 <span class="note-blue">ㄴ→</span> 누르면 풀이</p>
     </div>
     <div class="concept-modes" id="concept-modes" role="group" aria-label="보기 방식">
       <button class="mini" type="button" data-mode="range">오늘 범위 <small id="mode-range-day"></small></button>
@@ -168,7 +167,7 @@
             <button class="mini" id="note-toggle" type="button" aria-pressed="false">풀이 펼치기</button>
           </div>
         </div>
-        <p class="blank-hint">빨간 핵심어를 가렸습니다. 떠올린 다음 빈칸을 누르면 답이 보이고, 다시 누르면 가려집니다. 아래 풀이 줄, 핵심 키워드, 시험 포인트는 답이 보여서 숨겼습니다.</p>
+        <p class="blank-hint">빈칸을 누르면 답이 보이고, 다시 누르면 가려집니다.</p>
         <div id="concept-list"></div>
         <div class="concept-nav" id="concept-nav"></div>
       </article>
@@ -179,13 +178,11 @@
   <section class="view" id="view-quiz">
     <div class="view-head">
       <h1>기출 유형 문제</h1>
-      <p>범위와 문항 수를 고르고 시작하세요. 틀린 문제는 자동으로 오답 노트에 저장됩니다.</p>
     </div>
     <div class="card quiz-adaptive" id="quiz-adaptive">
       <div class="qa-text">
         <h2>맞춤 문제</h2>
         <p id="quiz-adaptive-sum"></p>
-        <small>복습 차례인 문제부터, 그다음 배운 범위에서 약한 주제 위주로 10문제를 고릅니다. 틀리면 같은 주제 문제가 곧바로 한 번 더 나옵니다.</small>
       </div>
       <button class="primary" id="quiz-adaptive-go" type="button">맞춤 10문제 시작</button>
     </div>
@@ -213,12 +210,7 @@
       </div>
       <button class="primary" id="quiz-start">문제 풀기 시작</button>
     </div>
-    <div class="card official" id="quiz-official">
-      <h2>공식 기출문제도 꼭 풀어보세요</h2>
-      <p>여기 문제는 실제 출제 방식에 맞춰 새로 만든 연습 문제입니다. 실제 기출문제는 <b>실전 기출</b> 탭에서 80분 재고 풀고 바로 채점할 수 있습니다.</p>
-      <button class="mini" type="button" data-goto="mock">실전 기출 풀러 가기</button>
-      <small>기출문제 출처: 국사편찬위원회. 공공누리 제4유형(출처표시, 상업적 이용금지, 변경금지)에 따라 원문은 이 사이트에 옮기지 않았습니다.</small>
-    </div>
+    <p class="official" id="quiz-official">출제 방식에 맞춰 새로 만든 연습 문제입니다. 실제 기출은 <button class="linkish" type="button" data-goto="mock">실전 기출</button>에서 풉니다.</p>
     <div id="quiz-run" class="hidden"></div>
     <div id="quiz-result" class="hidden"></div>
   </section>
@@ -227,7 +219,7 @@
   <section class="view" id="view-mock">
     <div class="view-head">
       <h1>실전 기출 모의고사</h1>
-      <p>공식 기출 문제지에서 문제를 한 문제씩 크게 잘라 보여 줍니다. 80분 타이머가 돌고, 제출하면 공식 정답표로 바로 채점합니다. 틀린 문제는 어느 시대·주제인지 알려 주고 개념 정리로 이어집니다.</p>
+      <p>80분 타이머로 풀고, 제출하면 공식 정답표로 바로 채점합니다.</p>
     </div>
     <div id="mock-pick"></div>
     <div id="mock-run" class="hidden"></div>
@@ -238,7 +230,6 @@
   <section class="view" id="view-wrong">
     <div class="view-head">
       <h1>오답 노트</h1>
-      <p>틀린 문제만 모았습니다. 시험 전날에는 이것만 보세요.</p>
     </div>
     <div class="btn-group" style="margin-bottom:16px">
       <button class="mini" id="wrong-retry">오답만 다시 풀기</button>
@@ -250,7 +241,7 @@
   <section class="view" id="view-analysis">
     <div class="view-head">
       <h1>약점 분석</h1>
-      <p>어디를 고치면 점수가 가장 많이 오르는지 계산합니다. <b>시험 출제 비중 × 틀리는 비율</b>로 순위를 매기고, 실전 기출 답은 실제 시험에 가까워 연습 문제보다 두 배로 칩니다. 한 시대에서 5문항 이상 풀어야 순위에 들어갑니다.</p>
+      <p><b>출제 비중 × 틀리는 비율</b>로, 고치면 점수가 가장 많이 오르는 곳부터 보여 줍니다.</p>
     </div>
     <div id="analysis-box"></div>
     <div class="card ana-ai">
@@ -258,7 +249,7 @@
         <h2>AI에게 상담하기</h2>
         <button class="primary small" id="ana-copy" type="button">AI 상담용 복사</button>
       </div>
-      <p class="ana-hint">버튼을 누르면 시대별 정답률, 실전 점수, 틀린 문제가 질문 글로 정리되어 복사됩니다. Claude 같은 AI 채팅에 붙여 넣으면 자주 틀리는 패턴, 헷갈리는 개념 구분표, 남은 날 하루 단위 계획을 받아 볼 수 있습니다. 실전 기출은 저작권 때문에 문제 원문 없이 주제와 답만 들어가고, 사이트는 이 기록을 어디에도 보내지 않습니다.</p>
+      <p class="ana-hint">내 기록을 질문 글로 정리해 복사합니다. AI 채팅에 붙여 넣으세요. 기출 문제 원문은 들어가지 않습니다.</p>
       <textarea id="ana-text" class="ana-text hidden" readonly aria-label="AI 상담용 글"></textarea>
     </div>
   </section>
@@ -267,7 +258,6 @@
   <section class="view" id="view-timeline">
     <div class="view-head">
       <h1>연표 · 타임라인</h1>
-      <p>시간은 왼쪽에서 오른쪽으로 흐릅니다.</p>
     </div>
     <div class="search-row">
       <input type="search" id="tl-search" placeholder="검색 (예: 1270, 무신 정권, 만적)">
@@ -279,10 +269,7 @@
 </main>
 
 <footer class="foot">
-  <p>
-    학습 기록은 브라우저에만 저장됩니다. <br>
-    문의: 26_07@bssm.hs.kr <br>
-  </p>
+  <p>문의: 26_07@bssm.hs.kr</p>
 </footer>
 </div>
 </div>

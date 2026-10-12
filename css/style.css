@@ -105,6 +105,9 @@ main{max-width:1100px;margin:0 auto;padding:30px 36px 60px}
 .view-head{margin-bottom:20px}
 .view-head h1{font-size:24px;margin:0 0 6px;letter-spacing:-.5px}
 .view-head p{margin:0;color:var(--ink-soft);font-size:14px}
+.view-head p:empty{display:none}
+.view-head .legend{font-size:13px}
+.view-head .legend .lg-red{color:var(--accent)}
 .hidden{display:none !important}
 
 .card{
@@ -133,12 +136,12 @@ main{max-width:1100px;margin:0 auto;padding:30px 36px 60px}
 .stat.accent small{color:var(--hero-ink);opacity:.8}
 .dash-mid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:16px;margin-bottom:16px;align-items:start}
 .dash-mid>.card{margin:0}
-details.strategy>summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between}
-details.strategy>summary::-webkit-details-marker{display:none}
-details.strategy>summary h2{margin:0}
-details.strategy>summary::after{content:"▾";color:var(--ink-soft);font-size:13px;transition:transform .2s}
-details.strategy:not([open])>summary::after{transform:rotate(-90deg)}
-details.strategy[open]>summary{margin-bottom:14px}
+details.fold-card>summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between}
+details.fold-card>summary::-webkit-details-marker{display:none}
+details.fold-card>summary h2{margin:0}
+details.fold-card>summary::after{content:"▾";color:var(--ink-soft);font-size:13px;transition:transform .2s}
+details.fold-card:not([open])>summary::after{transform:rotate(-90deg)}
+details.fold-card[open]>summary{margin-bottom:14px}
 @media(max-width:980px){.dash-top,.dash-mid{grid-template-columns:1fr}}
 /* 약점 분석 */
 .ana-goal{display:flex;align-items:center;gap:18px;padding:4px 0 14px;border-bottom:1px solid var(--line);margin-bottom:6px;flex-wrap:wrap}
@@ -241,8 +244,7 @@ details.strategy[open]>summary{margin-bottom:14px}
 .quiz-adaptive{display:flex;align-items:center;gap:18px;flex-wrap:wrap;border-left:3px solid var(--accent)}
 .qa-text{flex:1;min-width:240px}
 .qa-text h2{margin-bottom:6px}
-.qa-text p{margin:0 0 4px;font-size:14px}
-.qa-text small{font-size:12px;color:var(--ink-soft);line-height:1.6;display:block}
+.qa-text p{margin:0;font-size:14px}
 .ana-weak{display:flex;flex-direction:column}
 .ana-wk{display:grid;grid-template-columns:minmax(0,200px) minmax(0,1fr) 40px auto auto;align-items:center;gap:10px;padding:7px 0;border-bottom:1px dashed var(--line);font-size:13px}
 .ana-wk:last-child{border-bottom:0}
@@ -623,9 +625,8 @@ html.theme-vt::view-transition-new(root){animation-name:theme-fade-in}
 .q-tag.st-wrong{background:var(--bad-bg);color:var(--bad);font-weight:600}
 .q-tag.st-again{background:var(--chip-bg);color:var(--ink-soft)}
 .mini small{font-size:11px;opacity:.75;margin-left:2px}
-.official p{margin:0 0 12px;font-size:13.5px;color:var(--ink-soft);line-height:1.7}
-.official a.mini{display:inline-block;text-decoration:none;color:var(--accent);font-weight:600}
-.official small{display:block;margin-top:10px;font-size:11.5px;color:var(--ink-soft)}
+.official{margin:14px 2px 0;font-size:12.5px;color:var(--ink-soft);line-height:1.6}
+.linkish{padding:0;border:0;background:none;font:inherit;color:var(--accent);font-weight:600;text-decoration:underline;text-underline-offset:2px;cursor:pointer}
 
 /* 사진 */
 .photo{margin:12px 0}
@@ -752,8 +753,7 @@ html.theme-vt::view-transition-new(root){animation-name:theme-fade-in}
 .wq-note .wq-photos img{height:120px}
 #lock-link{display:block;margin-top:6px;color:var(--ink-soft);text-decoration:underline}
 #lock-link.hidden{display:none}
-.data-card .data-now{margin:0 0 4px;font-size:13.5px;font-weight:600}
-.data-card .data-note{margin:0 0 12px;font-size:13px;line-height:1.65;color:var(--ink-soft)}
+.data-card .data-now{margin:0 0 12px;font-size:13.5px;font-weight:600}
 .data-card #acc-reset-all{margin-left:auto}
 @media (max-width:560px){.data-card #acc-reset-all{margin-left:0}}
 .wq-bar{display:grid;gap:9px;margin:0 0 6px;padding:11px 13px;border-radius:12px;background:var(--surface-2);border:1px solid var(--line)}
