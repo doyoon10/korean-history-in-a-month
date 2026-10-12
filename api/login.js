@@ -20,7 +20,8 @@ export default async function handler(request) {
       headers.append("set-cookie", MARK + "=; Path=/; Max-Age=0; Secure; SameSite=Lax");
       return new Response(null, { status: 303, headers });
     }
-    return json({ locked: !!password });
+    // env: 서버가 환경 변수를 읽을 수 있는지 확인하는 데 쓴다 (Vercel이 넣어 주는 값, 비밀이 아니다)
+    return json({ locked: !!password, env: process.env.VERCEL_ENV || null });
   }
   if (request.method !== "POST") return json({ ok: false }, 405);
   if (!password) return json({ ok: true, open: true });
