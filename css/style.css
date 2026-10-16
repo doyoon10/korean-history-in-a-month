@@ -5,6 +5,7 @@
   --blue:#2f5cd4;--green:#2f9e44;--orange:#e8590c;--bad:#c92a2a;
   --track:#eceae5;--chip-bg:#f1efea;--chip-ink:#4a4f57;
   --hl-bg:#fff8db;--hl-line:#f0d58a;--hl-ink:#8a6d00;
+  --find-bg:#ffe866;--find-cur:#ffb648;
   --ok-bg:#eefaf0;--bad-bg:#fdefef;--pick-bg:#eef2fd;
   --topbar:rgba(255,255,255,.92);
   --shadow:0 1px 2px rgba(0,0,0,.05), 0 4px 16px rgba(0,0,0,.04);
@@ -24,6 +25,7 @@
   --blue:#7194f2;--green:#4cc265;--orange:#f08a4b;--bad:#f06a6a;
   --track:#2c2f35;--chip-bg:#2a2d33;--chip-ink:#c9cdd3;
   --hl-bg:#342d13;--hl-line:#6b5a1f;--hl-ink:#f0cf6a;
+  --find-bg:rgba(250,204,21,.34);--find-cur:rgba(251,146,60,.62);
   --ok-bg:#16301d;--bad-bg:#3a1c1c;--pick-bg:#1c2745;
   --topbar:rgba(22,23,26,.9);
   --shadow:0 1px 2px rgba(0,0,0,.35), 0 4px 16px rgba(0,0,0,.3);
@@ -42,6 +44,7 @@
   --blue:#7194f2;--green:#4cc265;--orange:#f08a4b;--bad:#f06a6a;
   --track:#2c2f35;--chip-bg:#2a2d33;--chip-ink:#c9cdd3;
   --hl-bg:#342d13;--hl-line:#6b5a1f;--hl-ink:#f0cf6a;
+  --find-bg:rgba(250,204,21,.34);--find-cur:rgba(251,146,60,.62);
   --ok-bg:#16301d;--bad-bg:#3a1c1c;--pick-bg:#1c2745;
   --topbar:rgba(22,23,26,.9);
   --shadow:0 1px 2px rgba(0,0,0,.35), 0 4px 16px rgba(0,0,0,.3);
@@ -661,6 +664,14 @@ html.theme-vt::view-transition-new(root){animation-name:theme-fade-in}
 .toc-top input:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
 .toc-list{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:4px 8px 12px;position:relative}
 .toc-count{font-size:12px;color:var(--ink-soft);margin:8px 8px 0}
+.toc-count .linkish{font-size:12px;margin-left:2px}
+/* 검색어 형광펜. 숨은 풀이 속에만 있으면 그 풀이 단어를, 접힌 보기 속에 있으면 여는 단추를 칠한다 */
+mark.find-hit{background:var(--find-bg);color:inherit;border-radius:3px;box-shadow:0 0 0 1.5px var(--find-bg)}
+mark.find-hit.find-cur{background:var(--find-cur);box-shadow:0 0 0 2px var(--find-cur)}
+.toc-item.on mark.find-hit{background:#ffe866;box-shadow:0 0 0 1.5px #ffe866;color:#2a2200}
+#concept-list:not(.notes-open) .nt-note:has(.nt-text mark.find-hit) .nt-head,
+details:not([open]):has(mark.find-hit)>summary{background:var(--find-bg);border-radius:4px}
+.nt-head.find-cur,summary.find-cur{background:var(--find-cur) !important}
 .toc-era{margin-top:10px}
 .toc-era-name{display:flex;justify-content:space-between;gap:6px;align-items:baseline;padding:4px 8px;font-size:12px;font-weight:700;color:var(--accent)}
 .toc-era-name small{flex:none;font-size:11px;font-weight:500;color:var(--ink-soft)}

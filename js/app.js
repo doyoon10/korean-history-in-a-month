@@ -147,10 +147,10 @@
       if (!desc && !detail) return;
       cur = el;
       // 첫 줄은 필기에 그대로 옮겨 적는 모양: 단어(괄호 내용). 괄호가 없던 단어는 쉬운 뜻을 괄호에 넣는다
-      var pen = detail || desc;
+      var pen = detail || desc, q = el.closest("#concept-list") ? findQuery() : "";
       pop.innerHTML = '<div class="gp-head">' + (type ? '<span class="gp-type">' + esc(type) + "</span>" : "") +
-        '<span class="gp-title">' + esc(title) + '<span class="gp-paren">(' + esc(pen) + ")</span></span></div>" +
-        (detail && desc ? '<div class="gp-desc">' + esc(desc) + "</div>" : "");
+        '<span class="gp-title">' + markText(title, q) + '<span class="gp-paren">(' + markText(pen, q) + ")</span></span></div>" +
+        (detail && desc ? '<div class="gp-desc">' + markText(desc, q) + "</div>" : "");
       pop.style.left = "0px";
       pop.style.top = "0px";
       pop.hidden = false;
@@ -1110,6 +1110,17 @@
       // 오늘 범위를 보는 중에 범위 안 주제를 누르면 그 자리로 내려가고, 범위 밖이면 그 주제 하나를 연다
       if (stacked() && rangeIds().indexOf(b.dataset.topicId) !== -1) jumpTo(b.dataset.topicId);
       else pickTopic(b.dataset.topicId);
+      if (findQuery()) goHit(b.dataset.topicId);
+    });
+    $("#concept-toc").addEventListener("click", function (e) {
+      if (e.target.closest("#find-next")) goHit();
+    });
+    $("#concept-search").addEventListener("keydown", function (e) {
+      if (e.key !== "Enter" || e.isComposing || e.keyCode === 229) return;
+      e.preventDefault();
+      if (!findQuery() || goHit()) return;
+      var first = $("#concept-toc [data-topic-id]");
+      if (first) first.click();
     });
     $("#concept-list").addEventListener("click", function (e) {
       var b = e.target.closest("[data-jump-topic]");
@@ -1177,16 +1188,18 @@
   }
 
   function renderToc() {
-    var q = $("#concept-search").value.trim().toLowerCase();
+    var raw = findQuery(), q = raw.toLowerCase();
     var host = $("#concept-toc");
+    var spots = paintHits($("#concept-list"), raw);
     var inRange = rangeIds(), today = finalOn() ? [] : todayPlan().concepts;
     var list = TOPICS.filter(function (x) {
       if (!q) return true;
       var t = x.t;
-      var hay = (t.title + " " + t.points.join(" ") + " " + t.keywords.join(" ") + " " + t.tip).toLowerCase();
+      var hay = (t.title + " " + t.points.join(" ") + " " + t.keywords.join(" ") + " " + t.tip).replace(/\*\*/g, "").toLowerCase();
       return hay.indexOf(q) !== -1;
     });
-    var html = q ? '<p class="toc-count">' + list.length + "개 주제에 있습니다</p>" : "";
+    var html = q ? '<p class="toc-count">' + list.length + "개 주제에 있습니다" +
+      (spots ? ' · 이 화면 <b id="find-pos">' + spots + '곳</b> <button type="button" class="linkish" id="find-next">다음 ↓</button>' : "") + "</p>" : "";
     var lastEra = null;
     list.forEach(function (x) {
       if (x.era !== lastEra) {
@@ -1199,7 +1212,7 @@
       var lv = masteryLevel(masteryOf(id));
       html += '<button type="button" class="toc-item' + cls +
         (today.indexOf(id) !== -1 ? " focus" : "") + '" data-topic-id="' + id + '">' +
-        (lv ? '<i class="mdot m-' + lv + '" title="숙련도 ' + pctOf(S.mastery[id].s) + '%"></i>' : "") + esc(x.t.title) + "</button>";
+        (lv ? '<i class="mdot m-' + lv + '" title="숙련도 ' + pctOf(S.mastery[id].s) + '%"></i>' : "") + markText(x.t.title, raw) + "</button>";
     });
     if (lastEra) html += "</div>";
     host.innerHTML = list.length ? html : '<p class="empty">검색 결과가 없습니다.</p>';
@@ -1209,6 +1222,84 @@
       var top = on.offsetTop - host.offsetTop;
       if (top < host.scrollTop || top + on.offsetHeight > host.scrollTop + host.clientHeight) host.scrollTop = top - host.clientHeight / 3;
     }
+  }
+
+  // ----- 검색어 형광펜: 목차에서 찾은 낱말이 본문 어디에 있는지 칠해 둔다 -----
+  // 굵게·밑줄로 글자가 쪼개져 있어도 이어 붙여 찾는다. 숨은 곳(풀이 말풍선, 접힌 보기)에만 있으면 그 단어·단추를 칠한다
+  var findAt = -1;
+  function findQuery() { return $("#concept-search").value.trim(); }
+  function markText(str, q) {
+    if (!q) return esc(str);
+    var low = str.toLowerCase(), nq = q.toLowerCase(), out = "", p = 0, i;
+    while ((i = low.indexOf(nq, p)) !== -1) {
+      out += esc(str.slice(p, i)) + '<mark class="find-hit">' + esc(str.slice(i, i + nq.length)) + "</mark>";
+      p = i + nq.length;
+    }
+    return out + esc(str.slice(p));
+  }
+  function clearHits(root) {
+    $$("mark.find-hit", root).forEach(function (m) {
+      var p = m.parentNode;
+      p.replaceChild(document.createTextNode(m.textContent), m);
+      p.normalize();
+    });
+  }
+  // 칠한 뒤 화면에서 찾아갈 수 있는 자리 수를 돌려준다
+  function paintHits(root, q) {
+    clearHits(root);
+    findAt = -1;
+    if (!q) return 0;
+    var nodes = [], text = "", walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null), n;
+    while ((n = walk.nextNode())) {
+      if (!n.nodeValue || n.parentNode.closest("button")) continue;
+      nodes.push({ node: n, s: text.length });
+      text += n.nodeValue;
+    }
+    var hay = text.toLowerCase(), nq = q.toLowerCase(), hits = [], at = 0;
+    while ((at = hay.indexOf(nq, at)) !== -1) { hits.push(at); at += nq.length; }
+    // 뒤에서부터 감싸야 앞쪽 글자 위치가 그대로 남는다
+    var k = nodes.length - 1;
+    for (var h = hits.length - 1; h >= 0; h--) {
+      var a = hits[h], b = a + nq.length;
+      while (k >= 0 && nodes[k].s >= b) k--;
+      for (var j = k; j >= 0 && nodes[j].s + nodes[j].node.nodeValue.length > a; j--) wrapHit(nodes[j], a, b);
+    }
+    return hits.length ? hitTargets(root).length : 0;
+  }
+  function wrapHit(it, a, b) {
+    var node = it.node, from = Math.max(a - it.s, 0), to = Math.min(b - it.s, node.nodeValue.length);
+    var mid = from > 0 ? node.splitText(from) : node;
+    if (to - from < mid.nodeValue.length) mid.splitText(to - from);
+    var mk = document.createElement("mark");
+    mk.className = "find-hit";
+    mid.parentNode.replaceChild(mk, mid);
+    mk.appendChild(mid);
+  }
+  function shown(el) { return !!(el && el.getClientRects().length); }
+  function hitTargets(root) {
+    var out = [];
+    $$("mark.find-hit", root).forEach(function (m) {
+      var t = shown(m) ? m : null;
+      if (!t) { var nt = m.closest(".nt-note"); t = nt && nt.querySelector(".nt-head"); }
+      if (!shown(t)) { var d = m.closest("details:not([open])"); t = d && d.querySelector("summary"); }
+      if (shown(t) && out.indexOf(t) === -1) out.push(t);
+    });
+    return out;
+  }
+  // 다음 자리로 내려간다. id를 주면 그 주제 안의 첫 자리로
+  function goHit(id) {
+    var list = hitTargets($("#concept-list"));
+    if (!list.length) return false;
+    var sec = id && document.getElementById("topic-" + id), i = -1;
+    if (sec) for (var j = 0; j < list.length && i < 0; j++) if (sec.contains(list[j])) i = j;
+    findAt = i >= 0 ? i : (findAt + 1) % list.length;
+    $$("#concept-list .find-cur").forEach(function (x) { x.classList.remove("find-cur"); });
+    var el = list[findAt];
+    el.classList.add("find-cur");
+    window.scrollTo({ top: el.getBoundingClientRect().top + window.pageYOffset - window.innerHeight / 3, behavior: "smooth" });
+    var pos = $("#find-pos");
+    if (pos) pos.textContent = (findAt + 1) + " / " + list.length + "곳";
+    return true;
   }
 
   function masteryBadge(id) {
