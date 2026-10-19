@@ -848,15 +848,13 @@ span.plan-check{cursor:default}
 
 /* 개념 정리 (코넬 노트 배치): 왼쪽 좁은 칸 = 왕·사건, 오른쪽 넓은 칸 = 한 줄에 하나씩, 맨 아래 정리.
    색은 셋만: 기본 검정, 핵심어 빨강, 덧붙임(괄호) 흐린 갈색 */
-.cn{margin-top:10px}
-.cn-row{display:grid;grid-template-columns:8.5em minmax(0,1fr)}
-.cn-row.solo{grid-template-columns:minmax(0,1fr)}
-.cn-row+.cn-row>*{border-top:1px solid color-mix(in srgb,var(--line) 60%,transparent)}
-.cn-cue{padding:11px 16px 11px 2px;border-right:2px solid var(--line);font-size:14.5px;font-weight:800;line-height:1.6;color:var(--ink);letter-spacing:-.2px}
+.cn{display:grid;gap:10px;margin-top:12px}
+.cn-row{display:grid;grid-template-columns:8.5em minmax(0,1fr);border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--card)}
+.cn-row.solo{grid-template-columns:minmax(0,1fr);background:var(--surface-2)}
+.cn-cue{padding:13px 14px;background:var(--accent-soft);font-size:15.5px;font-weight:800;line-height:1.5;color:var(--accent);letter-spacing:-.3px}
 .cn-cue b{color:inherit}
-.cn-cue .cv-paren{display:block;margin-top:1px;font-size:12px;font-weight:500;line-height:1.45}
-.cn-note{padding:11px 2px 11px 18px;min-width:0}
-.cn-row.solo .cn-note{padding-left:2px}
+.cn-cue .cv-paren{display:block;margin-top:3px;font-size:12px;font-weight:500;line-height:1.45}
+.cn-note{padding:12px 16px;min-width:0}
 .cn-list,.cn-flow{list-style:none;margin:0;padding:0}
 .cn-list+.cn-list,.cn-list+.cn-flow,.cn-flow+.cn-list,.cn-flow+.cn-flow{margin-top:8px}
 .cn-list li{position:relative;padding-left:15px;font-size:15px;line-height:1.75;color:var(--ink)}
@@ -878,11 +876,9 @@ span.plan-check{cursor:default}
 .lg-paren{color:var(--paren)}
 @media (max-width:560px){
   .cn-row,.cn-row.solo{grid-template-columns:minmax(0,1fr)}
-  .cn-cue{padding:12px 2px 2px;border-right:0}
+  .cn-cue{padding:9px 13px}
   .cn-cue .cv-paren{display:inline;margin-left:5px}
-  .cn-row+.cn-row>.cn-note{border-top:0}
-  .cn-note,.cn-row.solo .cn-note{padding:4px 2px 12px}
-  .cn-row.solo+.cn-row>.cn-cue{border-top:1px solid color-mix(in srgb,var(--line) 60%,transparent)}
+  .cn-note{padding:10px 13px 12px}
   .cn-list li,.cn-flow li{font-size:14.5px}
 }
 .search-row{display:flex;gap:8px;align-items:stretch}
