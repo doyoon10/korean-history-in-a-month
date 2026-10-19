@@ -1276,20 +1276,17 @@
     }).join("");
     if (picks) {
       return '<section class="topic-page" id="topic-' + t.id + '">' + heading +
-        '<div class="topic-body"><ul class="cv-rows">' + rows + "</ul>" +
+        '<div class="topic-body"><div class="cn">' + rows + "</div>" +
         (photos && photos.length ? '<div class="photo-row">' + photos.map(function (id) { return figureHtml(id, true); }).join("") + "</div>" : "") +
         "</div></section>";
     }
     // 주제 사진에, 틀린 문제에 해당하는 다른 주제의 사진을 앞에 더한다
     var ids = (photos || []).concat((IMAGES_BY_TOPIC[t.id] || []).filter(function (id) { return (photos || []).indexOf(id) === -1; }));
     return '<section class="topic-page" id="topic-' + t.id + '">' + heading +
-      '<div class="topic-body">' +
-      '<div class="cv-sum"><span class="cv-sum-lab">핵심</span><p>' + linkTerms(fmt(t.tip), era.id, seen) + "</p></div>" +
-      '<ul class="cv-rows">' + rows + "</ul>" +
+      '<div class="topic-body"><div class="cn">' + rows + "</div>" +
+      '<div class="cn-sum"><span class="cn-sum-lab">정리</span><p>' + linkTerms(fmt(t.tip), era.id, seen) + "</p></div>" +
       (ids.length ? '<div class="photo-row">' + ids.map(function (id) { return figureHtml(id, true); }).join("") + "</div>" : "") +
-      '<div class="kw-row"><span class="kw-lab">키워드</span>' +
-      t.keywords.map(function (k) { return '<span class="kw">' + linkTerms(esc(k), era.id, {}) + "</span>"; }).join("") +
-      "</div></div></section>";
+      "</div></section>";
   }
 
   function paintModes() {
@@ -1571,7 +1568,7 @@
     bindCropButtons(host);
     // 가려진 화면에서는 그리지 않는다. 개념 정리를 열 때 다시 그려지며 펼쳐진다
     // 필기 줄이 하나도 안 보일 때는 필기용 단추(괄호, 빈칸 모드, 풀이 펼치기)를 숨긴다
-    $(".reader-main").classList.toggle("no-notes", !$(".cv-row", host));
+    $(".reader-main").classList.toggle("no-notes", !$(".cn-row", host));
     if (wrongRestAll) $$("details.wq-rest", host).forEach(function (d) { d.open = true; });
     if (wrongOpenAll && host.offsetParent) expandAll(host, function (missing) { missingNote($(".exp-note", host), missing); }, true);
     else host._seq = (host._seq || 0) + 1;
@@ -1668,8 +1665,8 @@
     if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.pageYOffset - topbarH() - 14, behavior: "smooth" });
   }
 
-  // 개념 줄 그리기: 주체(왕·사건)는 왼쪽 칸, 내용은 오른쪽 칸.
-  // 괄호는 흐린 글씨로 제자리에 두고, '→'로 세 단계 넘게 이어지면 단계 상자로 그린다
+  // 개념 줄 그리기 (코넬 노트 배치): 왼쪽 좁은 칸에 왕·사건, 오른쪽 넓은 칸에 내용을 한 줄에 하나씩.
+  // 괄호는 흐린 글씨로 제자리에 두고, '→'로 세 단계 넘게 이어지면 세로 흐름도로 그린다
   function splitOut(s, sep) {
     var out = [], depth = 0, start = 0;
     for (var i = 0; i < s.length; i++) {
@@ -1695,29 +1692,34 @@
     out = out.replace(/ → /g, ' <span class="cv-arrow">→</span> ');
     return linkTerms(out, era, seen);
   }
+  function cvEven(x) { return (x.match(/\*\*/g) || []).length % 2 === 0; }
   function cvBody(raw, era, seen) {
     var steps = splitOut(raw, " → ");
-    var even = steps.every(function (x) { return (x.match(/\*\*/g) || []).length % 2 === 0; });
-    if (steps.length >= 3 && even) {
-      return '<div class="cv-flow">' + steps.map(function (x) {
-        return '<span class="cv-step">' + cvInline(x.trim(), era, seen) + "</span>";
-      }).join('<span class="cv-flow-arrow" aria-hidden="true">→</span>') + "</div>";
+    if (steps.length >= 3 && steps.every(cvEven)) {
+      return '<ol class="cn-flow">' + steps.map(function (x) {
+        return '<li class="cv-step">' + cvInline(x.trim(), era, seen) + "</li>";
+      }).join("") + "</ol>";
     }
-    return '<div class="cv-line">' + cvInline(raw, era, seen) + "</div>";
+    // 쉼표로 늘어놓은 것은 한 줄에 하나씩
+    var items = splitOut(raw, ", ").map(function (x) { return x.trim(); }).filter(Boolean);
+    if (!items.every(cvEven)) items = [raw];
+    return '<ul class="cn-list">' + items.map(function (x) {
+      return '<li class="cv-item">' + cvInline(x, era, seen) + "</li>";
+    }).join("") + "</ul>";
   }
   // pick(b, bi)를 주면 그 불릿만 그린다 (기출 오답의 관련 줄)
   function cvRows(raw, era, seen, pick) {
     return window.parseNote(raw).map(function (b, bi) {
       if (pick && !pick(b, bi)) return "";
-      var subj = b.rawSubject ? cvInline(b.rawSubject, era, seen) : "";
-      return '<li class="cv-row' + (subj ? "" : " solo") + '">' +
-        (subj ? '<div class="cv-subj">' + subj + "</div>" : "") +
-        '<div class="cv-body">' + b.raw.map(function (r) { return cvBody(r, era, seen); }).join("") + "</div></li>";
+      var cue = b.rawSubject ? cvInline(b.rawSubject, era, seen) : "";
+      return '<div class="cn-row' + (cue ? "" : " solo") + '">' +
+        (cue ? '<div class="cn-cue">' + cue + "</div>" : "") +
+        '<div class="cn-note">' + b.raw.map(function (r) { return cvBody(r, era, seen); }).join("") + "</div></div>";
     }).join("");
   }
 
   // 빈칸 모드: 첫 줄의 빨간 핵심어(주체는 빼고)를 가려 두고, 누르면 보였다 가려졌다 한다
-  var BLANK_KEY = "hanneung_blank", BLANK_SEL = ".cv-line > b, .cv-step > b";
+  var BLANK_KEY = "hanneung_blank", BLANK_SEL = ".cv-item > b, .cv-step > b";
   function isMasked(el) {
     if (!el.closest(".blank-on")) return false;
     var b = el.closest("b") || el.querySelector("b");
