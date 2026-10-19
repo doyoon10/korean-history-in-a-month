@@ -392,12 +392,6 @@ details.fold-card[open]>summary{margin-bottom:14px}
 #gloss-pop b{display:block;color:var(--accent);font-size:13px;margin-bottom:2px}
 .kw-row{display:flex;gap:5px;flex-wrap:wrap;margin:12px 0}
 .kw{background:var(--chip-bg);border-radius:6px;padding:2px 8px;font-size:12px;color:var(--chip-ink)}
-.tip{
-  background:var(--accent-soft);border-radius:10px;padding:11px 13px;
-  font-size:13px;line-height:1.7;
-}
-.tip b,.tip::before{color:var(--accent)}
-.tip::before{content:"시험 포인트 · ";font-weight:700;font-size:12px}
 
 /* ---------- quiz ---------- */
 .q-progress{display:flex;align-items:center;gap:12px;margin-bottom:14px}
@@ -665,13 +659,12 @@ html.theme-vt::view-transition-new(root){animation-name:theme-fade-in}
 .toc-list{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:4px 8px 12px;position:relative}
 .toc-count{font-size:12px;color:var(--ink-soft);margin:8px 8px 0}
 .toc-count .linkish{font-size:12px;margin-left:2px}
-/* 검색어 형광펜. 숨은 풀이 속에만 있으면 그 풀이 단어를, 접힌 보기 속에 있으면 여는 단추를 칠한다 */
+/* 검색어 형광펜. 접힌 보기 속에만 있으면 여는 단추를 칠한다 */
 mark.find-hit{background:var(--find-bg);color:inherit;border-radius:3px;box-shadow:0 0 0 1.5px var(--find-bg)}
 mark.find-hit.find-cur{background:var(--find-cur);box-shadow:0 0 0 2px var(--find-cur)}
 .toc-item.on mark.find-hit{background:#ffe866;box-shadow:0 0 0 1.5px #ffe866;color:#2a2200}
-#concept-list:not(.notes-open) .nt-note:has(.nt-text mark.find-hit) .nt-head,
 details:not([open]):has(mark.find-hit)>summary{background:var(--find-bg);border-radius:4px}
-.nt-head.find-cur,summary.find-cur{background:var(--find-cur) !important}
+summary.find-cur{background:var(--find-cur) !important}
 .toc-era{margin-top:10px}
 .toc-era-name{display:flex;justify-content:space-between;gap:6px;align-items:baseline;padding:4px 8px;font-size:12px;font-weight:700;color:var(--accent)}
 .toc-era-name small{flex:none;font-size:11px;font-weight:500;color:var(--ink-soft)}
@@ -686,16 +679,14 @@ details:not([open]):has(mark.find-hit)>summary{background:var(--find-bg);border-
 /* 빈칸 모드: 빨간 핵심어를 가린다 */
 .blank-hint{display:none;margin:6px 0 10px;padding:8px 12px;border-radius:9px;background:var(--hl-bg);color:var(--hl-ink);font-size:12.5px;line-height:1.6}
 .blank-on .blank-hint{display:block}
-.blank-on .nt-main>b:not(:empty),.blank-on .nt-main>.nt-mark>b:not(:empty){cursor:pointer;border-radius:5px;padding:1px 3px;-webkit-user-select:none;user-select:none}
-.blank-on .nt-main>b:not(:empty):not(.shown),.blank-on .nt-main>.nt-mark>b:not(:empty):not(.shown){
-  color:transparent !important;background:var(--chip-bg);box-shadow:inset 0 -2px 0 var(--accent-line)}
-.blank-on .nt-main>b:not(.shown) *,.blank-on .nt-main>.nt-mark>b:not(.shown) *{color:transparent !important;text-decoration-color:transparent !important}
-.blank-on .nt-main>b:not(:empty):not(.shown):hover,.blank-on .nt-main>.nt-mark>b:not(:empty):not(.shown):hover{background:var(--accent-soft)}
-.blank-on .nt-main b.shown{background:var(--hl-bg)}
-.blank-on .nt-notes,.blank-on .kw-row,.blank-on .tip{display:none}
+.blank-on :is(.cv-line,.cv-step)>b:not(:empty){cursor:pointer;border-radius:5px;padding:1px 3px;-webkit-user-select:none;user-select:none}
+.blank-on :is(.cv-line,.cv-step)>b:not(:empty):not(.shown){color:transparent !important;background:var(--chip-bg);box-shadow:inset 0 -2px 0 var(--accent-line)}
+.blank-on :is(.cv-line,.cv-step)>b:not(.shown) *{color:transparent !important;text-decoration-color:transparent !important}
+.blank-on :is(.cv-line,.cv-step)>b:not(:empty):not(.shown):hover{background:var(--accent-soft)}
+.blank-on :is(.cv-line,.cv-step)>b.shown{background:var(--hl-bg)}
+.blank-on .cv-sum,.blank-on .kw-row{display:none}
 .topic-crumb{font-size:12.5px;font-weight:700;color:var(--accent)}
 .topic-crumb span{margin-left:6px;font-weight:500;color:var(--ink-soft)}
-#note-toggle{flex:none;white-space:nowrap}
 .topic-title{font-size:23px;margin:0 0 4px;letter-spacing:-.6px;line-height:1.35}
 .topic-page .topic-body{display:block;padding:0;border:0}
 .topic-page .topic-body ul{font-size:15px}
@@ -775,7 +766,7 @@ details:not([open]):has(mark.find-hit)>summary{background:var(--find-bg);border-
 .wq-chips .mini.active{color:#fff}
 .wq-chips .mini small{opacity:.8}
 .wq-bar+.exp-note{margin:6px 2px 0}
-.reader-main.no-notes #blank-toggle,.reader-main.no-notes #note-toggle,.reader-main.no-notes .paren-mode,.reader-main.no-notes .blank-hint{display:none !important}
+.reader-main.no-notes #blank-toggle,.reader-main.no-notes .blank-hint{display:none !important}
 @media (max-width:560px){
   .wq-bar{padding:9px 0 9px 12px}
   .wq-bar-lab{width:50px}
@@ -861,57 +852,38 @@ span.plan-check{cursor:default}
   .concept-nav button{font-size:13px;padding:9px 11px}
 }
 
-/* 손필기 모양 개념 정리 */
-.note-blue{color:var(--blue);font-weight:600}
-.note-gray{color:var(--ink-soft);font-weight:600}
-.topic-body li.nt{margin-bottom:16px}
-.nt-main{display:block}
-.nt-subj{color:var(--accent);font-weight:700}
-.nt-colon,.nt-sep{color:var(--ink-soft)}
-.nt-notes{margin:5px 0 0;display:flex;flex-wrap:wrap;gap:2px 14px;font-size:13px;line-height:1.7;color:var(--blue)}
-.nt-note{font-weight:600;cursor:help;border-radius:4px;outline:none}
-.nt-note .nt-head{text-decoration:underline dotted;text-decoration-color:color-mix(in srgb,var(--blue) 50%,transparent);text-underline-offset:3px}
-.nt-note:hover .nt-head,.nt-note:focus-visible .nt-head{background:color-mix(in srgb,var(--blue) 12%,transparent);text-decoration:none}
-.nt-arrow{margin-right:3px;opacity:.75;font-weight:400}
-.nt-text{display:none}
-/* 풀이 펼치기 */
-.notes-open .nt-notes{flex-direction:column;flex-wrap:nowrap;gap:3px}
-.notes-open .nt-note{display:flex;gap:8px;align-items:baseline;cursor:auto}
-.notes-open .nt-note .nt-head{flex:none;max-width:42%;text-decoration:none;background:none}
-.notes-open .nt-text{display:block;flex:1;min-width:0;font-weight:400}
-.nt-text b{color:inherit}
-.nt-text .term{text-decoration-color:color-mix(in srgb,var(--blue) 45%,transparent)}
+/* 개념 정리: 핵심 한 줄 + 두 칸 표(주체 | 내용) + 단계 상자 */
+.cv-sum{display:flex;gap:10px;align-items:flex-start;margin:6px 0 14px;padding:12px 14px;border-radius:12px;background:var(--hl-bg);border:1px solid var(--hl-line)}
+.cv-sum p{margin:0;font-size:14.5px;line-height:1.65;color:var(--ink)}
+.cv-sum-lab{flex:none;margin-top:1px;padding:1px 9px;border-radius:99px;background:var(--hl-ink);color:var(--card);font-size:11.5px;font-weight:800;line-height:1.75}
+.cv-rows{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
+.cv-row{display:grid;grid-template-columns:minmax(6.5em,9em) 1fr;gap:4px 18px;padding:12px 4px;border-bottom:1px solid var(--line)}
+.cv-row.solo{grid-template-columns:1fr}
+.cv-subj{font-size:14.5px;font-weight:800;line-height:1.65;color:var(--accent);letter-spacing:-.2px}
+.cv-subj b{color:inherit}
+.cv-subj .cv-paren{display:block;font-size:12px;font-weight:500;line-height:1.5}
+.cv-body{min-width:0;font-size:15px;line-height:1.75;color:var(--ink)}
+.cv-line+.cv-line,.cv-line+.cv-flow,.cv-flow+.cv-line,.cv-flow+.cv-flow{margin-top:6px}
+.cv-paren{color:var(--ink-soft);font-size:.88em;font-weight:400}
+.cv-paren b{color:inherit;font-weight:600}
+.cv-arrow{color:var(--ink-soft);font-weight:400}
+.cv-flow{display:flex;flex-wrap:wrap;align-items:center;row-gap:6px}
+.cv-step{padding:3px 11px;border-radius:9px;background:var(--surface-2);border:1px solid var(--line);font-size:14px;line-height:1.55}
+.cv-flow-arrow{padding:0 6px;color:var(--accent);font-weight:700}
+.kw-lab{align-self:center;margin-right:3px;font-size:11.5px;font-weight:700;color:var(--ink-soft)}
+.lg-term{text-decoration:underline dotted;text-decoration-thickness:2px;text-underline-offset:4px}
+@media (max-width:560px){
+  .cv-row{grid-template-columns:1fr;gap:2px;padding:11px 2px}
+  .cv-subj .cv-paren{display:inline;margin-left:5px}
+  .cv-body{font-size:14.5px}
+}
 .search-row{display:flex;gap:8px;align-items:stretch}
 .search-row input{flex:1;min-width:0}
-#note-toggle{flex:none;white-space:nowrap}
-#note-toggle.active{background:var(--blue);border-color:var(--blue);color:#fff}
-@media (max-width:480px){.notes-open .nt-note{flex-direction:column;gap:0}.notes-open .nt-note .nt-head{max-width:none}.notes-open .nt-text{padding-left:22px}}
-.nt-mark{text-decoration:underline;text-decoration-color:color-mix(in srgb,var(--blue) 70%,transparent);text-decoration-thickness:1.5px;text-underline-offset:4px;cursor:help;border-radius:3px}
-.nt-mark.hl,.nt-note.hl .nt-head{background:color-mix(in srgb,var(--blue) 18%,transparent)}
-.notes-open .nt-mark{cursor:auto}
-.nt-inl{display:none;color:var(--blue);font-weight:400}
-.nt-inl b{color:inherit;font-weight:700}
-.notes-open .nt-inl{display:inline}
-/* 괄호 걸러 보기: 걸러 낸 것과 그냥 연도는 '전부'에서만, 보통 글씨에 붙은 것은 '핵심'에서 숨긴다 */
-.notes-open .nt-inl.skip,.notes-open .nt-inl.yr{display:none}
-.notes-open.pm-key .nt-inl.sub{display:none}
-.notes-open.pm-all .nt-inl.skip,.notes-open.pm-all .nt-inl.yr{display:inline;color:var(--ink-soft);opacity:.75}
-.paren-mode{display:none;align-items:center;gap:4px;margin-right:6px}
-.reader-main:has(#concept-list.notes-open) .paren-mode{display:flex}
-.paren-mode>span{font-size:12px;color:var(--ink-soft);margin-right:2px}
-.paren-mode .mini{padding:4px 10px;font-size:12px}
-.notes-open .nt-note.inl .nt-detail{display:none}
-/* 호버 풀이: 종류 · 제목 / 쉬운 뜻 / 참고 */
+/* 용어 말풍선: 종류 · 단어 / 쉬운 뜻 */
 #gloss-pop .gp-head{display:flex;align-items:baseline;gap:6px}
 #gloss-pop .gp-type{flex:none;font-size:11px;font-weight:700;line-height:1.5;padding:0 6px;border-radius:5px;background:var(--accent-soft);color:var(--accent)}
 #gloss-pop .gp-title{font-weight:700;color:var(--ink);font-size:13.5px}
-#gloss-pop .gp-paren{color:var(--blue);font-weight:600}
 #gloss-pop .gp-desc{margin-top:5px;padding-top:5px;border-top:1px solid var(--line);font-size:13px;line-height:1.55}
-.nt-type:empty,.nt-desc:empty,.nt-detail:empty{display:none}
-.notes-open .nt-text .nt-type{display:inline-block;font-size:10.5px;line-height:1.5;padding:0 5px;margin-right:6px;border-radius:4px;background:color-mix(in srgb,var(--blue) 14%,transparent);vertical-align:1px}
-.notes-open .nt-text .nt-type:empty{display:none}
-.notes-open .nt-text .nt-detail{color:var(--ink-soft);margin-left:6px}
-.notes-open .nt-text .nt-desc:not(:empty)+.nt-detail::before{content:"· "}
 
 /* ---------- 실전 기출 ---------- */
 main:has(#view-mock.active #mock-run:not(.hidden)){max-width:1400px;padding-left:24px;padding-right:24px}

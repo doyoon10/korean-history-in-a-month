@@ -49,27 +49,6 @@
     var i = s.indexOf("|");
     return i < 0 ? { type: "", desc: s } : { type: s.slice(0, i), desc: s.slice(i + 1) };
   }
-  // 라벨에 들어 있는 풀이 용어 중 가장 긴 것 (라벨 자체가 용어면 그것)
-  function glossInLabel(label, era) {
-    if (glossFor(label, era)) return label;
-    var best = null;
-    if (glossRe) label.replace(glossRe, function (m, at, str) {
-      if (!/[가-힣0-9]/.test(str.charAt(at - 1)) && glossFor(m, era) && (!best || m.length > best.length)) best = m;
-      return m;
-    });
-    return best;
-  }
-  // 괄호 속 시험용 조각을 읽기 쉽게: 1398 → 1398년, 4C → 4세기, BC 2333 → 기원전 2333년
-  function readable(t) {
-    return t.replace(/(\d{4})\.(\d{1,2})\.(\d{1,2})(?!\d)/g, "$1년 $2월 $3일")
-      .replace(/(\d{4})\.(\d{1,2})(?![\d.])/g, "$1년 $2월")
-      .replace(/\bBC\s?(\d+)C\b/g, "기원전 $1세기")
-      .replace(/\bBC\s?(\d+)/g, "기원전 $1년")
-      .replace(/(\d+)C(?![a-zA-Z])/g, "$1세기")
-      .replace(/(^|[^\d.~년])(\d{3,4})(?=$|[\s,·)~\-])/g, "$1$2년")
-      .replace(/(\d+)s(?![a-zA-Z])/g, "$1년대");
-  }
-
   // fmt()를 거친 HTML에서 용어를 찾아 풀이 표시를 붙인다. seen에 있는 용어는 건너뛴다(주제당 한 번)
   function linkTerms(html, era, seen) {
     if (!glossRe) return html;
@@ -116,41 +95,23 @@
     document.body.appendChild(pop);
     var cur = null;
 
-    // 용어(.term) 또는 개념 정리의 파란 풀이 단어(.nt-note, 펼치기 모드가 아닐 때)
+    // 점선 밑줄 용어(.term). 빈칸 모드에서 가린 말은 뜻을 보여 주지 않는다
     function target(node) {
       if (!node || !node.closest) return null;
       var t = node.closest(".term");
-      if (t) return isMasked(t) ? null : t;
-      var n = node.closest(".nt-note, .nt-mark");
-      return n && !n.closest(".notes-open") && !isMasked(n) ? n : null;
-    }
-    // 본문 밑줄 단어는 같은 불릿의 짝 풀이를 보여 준다
-    function noteOf(el) {
-      if (el.classList.contains("nt-note")) return el;
-      var li = el.closest("li.nt");
-      return li && li.querySelector('.nt-note[data-k="' + el.dataset.k + '"]');
+      return t && !isMasked(t) ? t : null;
     }
     function show(el) {
-      var title, type = "", desc = "", detail = "";
-      var note = (el.classList.contains("nt-note") || el.classList.contains("nt-mark")) && noteOf(el);
-      if (note) {
-        title = note.dataset.label;
-        type = note.querySelector(".nt-type").textContent;
-        desc = note.querySelector(".nt-desc").textContent;
-        detail = note.querySelector(".nt-detail").textContent;
-      } else {
-        var d = glossFor(el.dataset.term, el.dataset.era);
-        if (!d) return;
-        d = splitDef(d);
-        title = el.dataset.term; type = d.type; desc = d.desc;
-      }
-      if (!desc && !detail) return;
+      var d = glossFor(el.dataset.term, el.dataset.era);
+      if (!d) return;
+      d = splitDef(d);
+      if (!d.desc) return;
       cur = el;
-      // 첫 줄은 필기에 그대로 옮겨 적는 모양: 단어(괄호 내용). 괄호가 없던 단어는 쉬운 뜻을 괄호에 넣는다
-      var pen = detail || desc, q = el.closest("#concept-list") ? findQuery() : "";
-      pop.innerHTML = '<div class="gp-head">' + (type ? '<span class="gp-type">' + esc(type) + "</span>" : "") +
-        '<span class="gp-title">' + markText(title, q) + '<span class="gp-paren">(' + markText(pen, q) + ")</span></span></div>" +
-        (detail && desc ? '<div class="gp-desc">' + markText(desc, q) + "</div>" : "");
+      // 위: 종류와 단어, 아래: 쉬운 뜻. 개념 정리에서 검색 중이면 검색어를 칠한다
+      var q = el.closest("#concept-list") ? findQuery() : "";
+      pop.innerHTML = '<div class="gp-head">' + (d.type ? '<span class="gp-type">' + esc(d.type) + "</span>" : "") +
+        '<span class="gp-title">' + markText(el.dataset.term, q) + "</span></div>" +
+        '<div class="gp-desc">' + markText(d.desc, q) + "</div>";
       pop.style.left = "0px";
       pop.style.top = "0px";
       pop.hidden = false;
@@ -1225,7 +1186,7 @@
   }
 
   // ----- 검색어 형광펜: 목차에서 찾은 낱말이 본문 어디에 있는지 칠해 둔다 -----
-  // 굵게·밑줄로 글자가 쪼개져 있어도 이어 붙여 찾는다. 숨은 곳(풀이 말풍선, 접힌 보기)에만 있으면 그 단어·단추를 칠한다
+  // 굵게·밑줄로 글자가 쪼개져 있어도 이어 붙여 찾는다. 접힌 보기 속에만 있으면 여는 단추를 칠한다
   var findAt = -1;
   function findQuery() { return $("#concept-search").value.trim(); }
   function markText(str, q) {
@@ -1280,7 +1241,6 @@
     var out = [];
     $$("mark.find-hit", root).forEach(function (m) {
       var t = shown(m) ? m : null;
-      if (!t) { var nt = m.closest(".nt-note"); t = nt && nt.querySelector(".nt-head"); }
       if (!shown(t)) { var d = m.closest("details:not([open])"); t = d && d.querySelector("summary"); }
       if (shown(t) && out.indexOf(t) === -1) out.push(t);
     });
@@ -1311,26 +1271,25 @@
   // photos: 고른 줄에 나오는 문화유산 사진 id (없으면 생략)
   function topicHtml(x, heading, picks, photos) {
     var t = x.t, era = x.era, seen = {};
+    var rows = t.points.map(function (p, pi) {
+      return cvRows(p, era.id, seen, picks ? function (b, bi) { return picks[pi + ":" + bi]; } : null);
+    }).join("");
     if (picks) {
       return '<section class="topic-page" id="topic-' + t.id + '">' + heading +
-        '<div class="topic-body"><ul class="points">' +
-        t.points.map(function (p, pi) {
-          return noteBulletsHtml(p, era.id, seen, t.id, function (b, bi) { return picks[pi + ":" + bi]; });
-        }).join("") + "</ul>" +
+        '<div class="topic-body"><ul class="cv-rows">' + rows + "</ul>" +
         (photos && photos.length ? '<div class="photo-row">' + photos.map(function (id) { return figureHtml(id, true); }).join("") + "</div>" : "") +
         "</div></section>";
     }
+    // 주제 사진에, 틀린 문제에 해당하는 다른 주제의 사진을 앞에 더한다
+    var ids = (photos || []).concat((IMAGES_BY_TOPIC[t.id] || []).filter(function (id) { return (photos || []).indexOf(id) === -1; }));
     return '<section class="topic-page" id="topic-' + t.id + '">' + heading +
-      '<div class="topic-body"><ul class="points">' +
-      t.points.map(function (p) { return noteBulletsHtml(p, era.id, seen, t.id); }).join("") + "</ul>" +
-      (function () {
-        // 주제 사진에, 틀린 문제에 해당하는 다른 주제의 사진을 앞에 더한다
-        var ids = (photos || []).concat((IMAGES_BY_TOPIC[t.id] || []).filter(function (id) { return (photos || []).indexOf(id) === -1; }));
-        return ids.length ? '<div class="photo-row">' + ids.map(function (id) { return figureHtml(id, true); }).join("") + "</div>" : "";
-      })() +
-      '<div class="kw-row">' +
+      '<div class="topic-body">' +
+      '<div class="cv-sum"><span class="cv-sum-lab">핵심</span><p>' + linkTerms(fmt(t.tip), era.id, seen) + "</p></div>" +
+      '<ul class="cv-rows">' + rows + "</ul>" +
+      (ids.length ? '<div class="photo-row">' + ids.map(function (id) { return figureHtml(id, true); }).join("") + "</div>" : "") +
+      '<div class="kw-row"><span class="kw-lab">키워드</span>' +
       t.keywords.map(function (k) { return '<span class="kw">' + linkTerms(esc(k), era.id, {}) + "</span>"; }).join("") +
-      '</div><div class="tip">' + linkTerms(fmt(t.tip), era.id, seen) + "</div></div></section>";
+      "</div></div></section>";
   }
 
   function paintModes() {
@@ -1612,7 +1571,7 @@
     bindCropButtons(host);
     // 가려진 화면에서는 그리지 않는다. 개념 정리를 열 때 다시 그려지며 펼쳐진다
     // 필기 줄이 하나도 안 보일 때는 필기용 단추(괄호, 빈칸 모드, 풀이 펼치기)를 숨긴다
-    $(".reader-main").classList.toggle("no-notes", !$(".points li", host));
+    $(".reader-main").classList.toggle("no-notes", !$(".cv-row", host));
     if (wrongRestAll) $$("details.wq-rest", host).forEach(function (d) { d.open = true; });
     if (wrongOpenAll && host.offsetParent) expandAll(host, function (missing) { missingNote($(".exp-note", host), missing); }, true);
     else host._seq = (host._seq || 0) + 1;
@@ -1709,150 +1668,56 @@
     if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.pageYOffset - topbarH() - 14, behavior: "smooth" });
   }
 
-  // 손필기 모양: "주체 : 핵심어들" 한 줄 + 아래에 'ㄴ→ 단어' (호버하면 종류·쉬운 뜻·괄호 속 참고)
-  // ** 굵게와 줄바꿈(\n = ' / ')이 섞인 원문을 그리면서, 풀이가 달린 범위에 밑줄 span을 씌운다.
-  // ranges: 굵게 표시를 뺀 글자 위치 기준 [{s, e, k}], 겹치지 않게 정렬된 상태
-  // parens: 원래 괄호 [{pos, html}] (pos 순). 제자리에 숨겨 두고 "풀이 펼치기"일 때 파란 괄호로 보인다
-  var YEAR_ONLY = /^[\d~.,\s년월일세기BC전후경초말중반C]+$/;
-  function renderMarked(raw, ranges, parens) {
-    var out = "", p = 0, bold = false, mark = null, ri = 0, pi = 0, boldEnd = -1;
-    function flipB(on) { out += on ? "<b>" : "</b>"; }
-    function closeMark() {
-      if (bold) flipB(false);
-      out += "</span>"; mark = null;
-      if (bold) flipB(true);
+  // 개념 줄 그리기: 주체(왕·사건)는 왼쪽 칸, 내용은 오른쪽 칸.
+  // 괄호는 흐린 글씨로 제자리에 두고, '→'로 세 단계 넘게 이어지면 단계 상자로 그린다
+  function splitOut(s, sep) {
+    var out = [], depth = 0, start = 0;
+    for (var i = 0; i < s.length; i++) {
+      var c = s.charAt(i);
+      if (c === "(") depth++;
+      else if (c === ")") depth--;
+      else if (depth === 0 && s.substr(i, sep.length) === sep) { out.push(s.slice(start, i)); start = i + sep.length; i += sep.length - 1; }
     }
-    // 괄호를 세 갈래로 나눈다.
-    //   기본: 빨간 핵심어에 붙었거나 안에 굵은 글씨가 든 괄호 (늘 보인다)
-    //   sub : 보통 글씨에 붙은 괄호 ('핵심'에서는 숨긴다)
-    //   yr·skip : 보통 글씨에 붙은 연도, 걸러 낸 괄호 ('전부'에서만 회색으로 보인다)
-    function putParens(all) {
-      while (pi < parens.length && (all || parens[pi].pos <= p)) {
-        var it = parens[pi++], h = it.html;
-        var onKey = bold || boldEnd === p;
-        var cls = it.skip ? " skip" : !onKey && YEAR_ONLY.test(h.replace(/<[^>]+>/g, "")) ? " yr"
-          : !onKey && h.indexOf("<b>") === -1 ? " sub" : "";
-        if (bold) flipB(false);
-        out += '<span class="nt-inl' + cls + '">(' + h + ")</span>";
-        if (bold) flipB(true);
-      }
-    }
-    for (var i = 0; i < raw.length; ) {
-      if (raw.substr(i, 2) === "**") { bold = !bold; if (!bold) boldEnd = p; flipB(bold); i += 2; continue; }
-      if (mark && p === mark.e) closeMark();
-      putParens(false);
-      if (!mark && ri < ranges.length && p === ranges[ri].s) {
-        mark = ranges[ri++];
-        if (bold) flipB(false);
-        out += '<span class="nt-mark" data-k="' + mark.k + '">';
-        if (bold) flipB(true);
-      }
-      var c = raw.charAt(i);
-      out += c === "\n" ? '<span class="nt-sep"> / </span>' : esc(c);
-      p++; i++;
-    }
-    if (mark) closeMark();
-    putParens(true);
-    if (bold) flipB(false);
+    out.push(s.slice(start));
     return out;
   }
-  // 라벨이 본문 어디에 있는지 찾는다 (at = 라벨이 끝나는 위치 추정값)
-  function rangeFor(plain, label, at) {
-    var guess = at - label.length;
-    if (guess >= 0 && plain.substr(guess, label.length) === label) return guess;
-    var i = plain.lastIndexOf(label, Math.max(0, at));
-    return i >= 0 ? i : plain.indexOf(label);
-  }
-  function toRanges(plain, notes, base) {
-    var out = [];
-    notes.forEach(function (n, j) {
-      var s = n.gloss ? n.at : rangeFor(plain, n.label, n.at);
-      if (s >= 0) out.push({ s: s, e: s + n.label.length, k: base + j });
-    });
-    out.sort(function (a, b) { return a.s - b.s; });
-    var last = -1;
-    return out.filter(function (r) { if (r.s < last) return false; last = r.e; return true; });
-  }
-
-  function noteBulletsHtml(raw, era, seen, topicId, pick) {
-    // 괄호에서 온 풀이: 라벨에 든 용어의 쉬운 뜻 + 괄호 속 내용(참고)
-    // pos: 원래 괄호가 있던 자리 (굵게 표시를 뺀 글자 위치)
-    function parenNote(n, at, pos) {
-      var note = { label: n.label, at: at, pos: pos, detail: linkTerms(fmt(readable(n.text)), era, {}) };
-      // 걸러 낸 괄호(뜻풀이·반복·곁가지)는 '괄호 전부'에서만 보인다
-      note.skip = ((window.NOTE_SKIP || {})[topicId] || []).indexOf(n.label + "|" + n.text) !== -1;
-      var easy = (window.NOTE_EASY || {})[topicId + "|" + n.label];
-      var term = glossInLabel(n.label, era);
-      if (easy) {
-        // 이 라벨만을 위해 쓴 쉬운 설명이 있으면 그것을 쓴다
-        var e = splitDef(easy);
-        note.type = e.type;
-        note.desc = e.desc;
-        if (term) seen[term] = 1;
-      } else if (term) {
-        var d = splitDef(glossFor(term, era));
-        note.type = d.type;
-        note.desc = (term !== n.label ? term + " — " : "") + d.desc;
-        seen[term] = 1;
-      }
-      return note;
+  function cvInline(raw, era, seen) {
+    var html = fmt(raw), out = "", depth = 0, inTag = false;
+    for (var i = 0; i < html.length; i++) {
+      var c = html.charAt(i);
+      if (c === "<") inTag = true;
+      if (!inTag && c === "(") { if (depth === 0) out += '<span class="cv-paren">'; depth++; out += c; continue; }
+      if (!inTag && c === ")" && depth > 0) { out += c; depth--; if (depth === 0) out += "</span>"; continue; }
+      if (c === ">") inTag = false;
+      out += c;
     }
-    function noteHtml(n, k, inline) {
-      return '<span class="nt-note' + (inline ? " inl" : "") + '" tabindex="0" data-k="' + k + '" data-label="' + esc(n.label) + '">' +
-        '<span class="nt-head"><span class="nt-arrow">ㄴ→</span>' + esc(n.label) + "</span>" +
-        '<span class="nt-text"><span class="nt-type">' + esc(n.type || "") + "</span>" +
-        '<span class="nt-desc">' + esc(n.desc || "") + "</span>" +
-        '<span class="nt-detail">' + (n.detail || "") + "</span></span></span>";
+    if (depth > 0) out += "</span>";
+    out = out.replace(/ → /g, ' <span class="cv-arrow">→</span> ');
+    return linkTerms(out, era, seen);
+  }
+  function cvBody(raw, era, seen) {
+    var steps = splitOut(raw, " → ");
+    var even = steps.every(function (x) { return (x.match(/\*\*/g) || []).length % 2 === 0; });
+    if (steps.length >= 3 && even) {
+      return '<div class="cv-flow">' + steps.map(function (x) {
+        return '<span class="cv-step">' + cvInline(x.trim(), era, seen) + "</span>";
+      }).join('<span class="cv-flow-arrow" aria-hidden="true">→</span>') + "</div>";
     }
-
-    return window.parseNote(raw).filter(function (b, bi) { return !pick || pick(b, bi); }).map(function (b) {
-      var subjPlain = window.noteStripStars(b.subject);
-      var subjNotes = b.subjectNotes.map(function (n) {
-        return parenNote(n, -1, b.subject.slice(0, n.at).replace(/\*\*/g, "").length);
-      });
-      // 주체에 들어 있는 용어는 따로 풀지 않는다
-      if (glossRe && subjPlain) subjPlain.replace(glossRe, function (m) { seen[m] = 1; return m; });
-
-      var joined = b.lines.join("\n");
-      var plain = joined.replace(/\*\*/g, "");
-      var notes = b.notes.map(function (n) {
-        var pos = joined.slice(0, n.at).replace(/\*\*/g, "").length;
-        return parenNote(n, pos, pos);
-      });
-      if (glossRe) {
-        plain.replace(glossRe, function (m, at, str) {
-          if (/[가-힣0-9]/.test(str.charAt(at - 1)) || seen[m]) return m;
-          var def = glossFor(m, era);
-          if (!def) return m;
-          seen[m] = 1;
-          // 이미 괄호 풀이가 붙은 라벨 안의 용어면 건너뛴다
-          if (notes.some(function (n) { return n.label.indexOf(m) !== -1; })) return m;
-          var d = splitDef(def);
-          notes.push({ label: m, type: d.type, desc: d.desc, at: at, gloss: true });
-          return m;
-        });
-      }
-      notes.sort(function (x, y) { return x.at - y.at; });
-      var subjRanges = toRanges(subjPlain, subjNotes, 0);
-      var bodyRanges = toRanges(plain, notes, subjNotes.length);
-      notes = subjNotes.concat(notes);
-      // 괄호 내용은 원래 자리에도 숨겨 둔다 (펼치기 모드에서 필기 모양 그대로 보이고, 아래 풀이에서는 뜻만 보임)
-      var subjParens = [], bodyParens = [];
-      notes.forEach(function (n, k) {
-        if (n.detail) (k < subjNotes.length ? subjParens : bodyParens).push({ pos: n.pos, html: n.detail, skip: n.skip });
-      });
-      function byPos(x, y) { return x.pos - y.pos; }
-
-      return '<li class="nt"><div class="nt-main">' +
-        (b.subject ? '<span class="nt-subj">' + renderMarked(b.subject, subjRanges, subjParens.sort(byPos)) + '</span><span class="nt-colon"> : </span>' : "") +
-        renderMarked(joined, bodyRanges, bodyParens.sort(byPos)) + "</div>" +
-        (notes.length ? '<div class="nt-notes">' + notes.map(function (n, k) { return noteHtml(n, k, !!n.detail); }).join("") + "</div>" : "") +
-        "</li>";
+    return '<div class="cv-line">' + cvInline(raw, era, seen) + "</div>";
+  }
+  // pick(b, bi)를 주면 그 불릿만 그린다 (기출 오답의 관련 줄)
+  function cvRows(raw, era, seen, pick) {
+    return window.parseNote(raw).map(function (b, bi) {
+      if (pick && !pick(b, bi)) return "";
+      var subj = b.rawSubject ? cvInline(b.rawSubject, era, seen) : "";
+      return '<li class="cv-row' + (subj ? "" : " solo") + '">' +
+        (subj ? '<div class="cv-subj">' + subj + "</div>" : "") +
+        '<div class="cv-body">' + b.raw.map(function (r) { return cvBody(r, era, seen); }).join("") + "</div></li>";
     }).join("");
   }
 
   // 빈칸 모드: 첫 줄의 빨간 핵심어(주체는 빼고)를 가려 두고, 누르면 보였다 가려졌다 한다
-  var BLANK_KEY = "hanneung_blank", BLANK_SEL = ".nt-main > b, .nt-main > .nt-mark > b";
+  var BLANK_KEY = "hanneung_blank", BLANK_SEL = ".cv-line > b, .cv-step > b";
   function isMasked(el) {
     if (!el.closest(".blank-on")) return false;
     var b = el.closest("b") || el.querySelector("b");
@@ -1880,55 +1745,6 @@
       b.classList.toggle("shown");
       // 다시 가릴 때 떠 있던 풀이 말풍선이 답을 보여 주지 않게 닫는다
       if (!b.classList.contains("shown")) { var pop = $("#gloss-pop"); if (pop) pop.hidden = true; }
-    });
-    paint();
-  }
-
-  // 파란 풀이는 평소엔 단어만 보이고 마우스를 올리면(탭하면) 뜬다. "풀이 펼치기"를 켜면 모두 펼쳐 보인다
-  var NOTES_KEY = "hanneung_notes_open", PAREN_KEY = "hanneung_paren_mode";
-  function initNoteToggle() {
-    var btn = $("#note-toggle"), list = $("#concept-list");
-    var open = false;
-    try { open = localStorage.getItem(NOTES_KEY) === "1"; } catch (e) {}
-    function paint() {
-      list.classList.toggle("notes-open", open);
-      btn.classList.toggle("active", open);
-      btn.textContent = open ? "풀이 접기" : "풀이 펼치기";
-      btn.setAttribute("aria-pressed", open ? "true" : "false");
-    }
-    // 괄호를 얼마나 보일지: 핵심(빨간 말에 붙은 것만) / 기본(걸러 낸 것 빼고) / 전부
-    var pm = "std";
-    try { pm = localStorage.getItem(PAREN_KEY) || "std"; } catch (e) {}
-    function paintPm() {
-      ["key", "std", "all"].forEach(function (m) { list.classList.toggle("pm-" + m, m === pm); });
-      $$("#paren-mode [data-pm]").forEach(function (b) { b.classList.toggle("active", b.dataset.pm === pm); });
-    }
-    $("#paren-mode").addEventListener("click", function (e) {
-      var b = e.target.closest("[data-pm]");
-      if (!b) return;
-      pm = b.dataset.pm;
-      try { localStorage.setItem(PAREN_KEY, pm); } catch (er) {}
-      paintPm();
-    });
-    paintPm();
-    // 본문 밑줄 단어와 아래 풀이 단어 중 하나에 올리면 짝도 같이 강조
-    function pair(el, on) {
-      var li = el.closest("li.nt");
-      if (!li) return;
-      $$('[data-k="' + el.dataset.k + '"]', li).forEach(function (x) { x.classList.toggle("hl", on); });
-    }
-    list.addEventListener("mouseover", function (e) {
-      var el = e.target.closest && e.target.closest(".nt-mark, .nt-note");
-      if (el) pair(el, true);
-    });
-    list.addEventListener("mouseout", function (e) {
-      var el = e.target.closest && e.target.closest(".nt-mark, .nt-note");
-      if (el && !(e.relatedTarget && el.contains(e.relatedTarget))) pair(el, false);
-    });
-    btn.addEventListener("click", function () {
-      open = !open;
-      try { localStorage.setItem(NOTES_KEY, open ? "1" : "0"); } catch (e) {}
-      paint();
     });
     paint();
   }
@@ -3806,7 +3622,6 @@
   initGlossary();
   initTabs();
   initConcept();
-  initNoteToggle();
   initBlank();
   initQuiz();
   initWrong();

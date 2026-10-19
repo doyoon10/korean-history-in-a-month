@@ -1,6 +1,7 @@
-/* 개념 불릿을 손필기 모양으로 나눈다.
-   "**최충헌**: **교정도감**(최고 권력 기구) / **최우**: **정방**(인사)"
-   → 주체마다 한 불릿, 본문의 괄호는 모두 빼서 아래 'ㄴ→' 풀이로 단다. */
+/* 개념 불릿을 주체마다 나눈다.
+   "**최충헌**: **교정도감**(최고 권력 기구) / **최우**: **정방**(인사)" → 최충헌 줄, 최우 줄
+   rawSubject·raw: 괄호가 든 원문(화면에 그린다)
+   subject·lines·notes: 괄호를 뺀 글과 괄호 목록(기출 오답에서 관련 줄을 찾는 데 쓴다) */
 (function () {
   "use strict";
 
@@ -83,9 +84,10 @@
       var sb = splitSubject(seg);
       if (sb || !bullets.length) {
         var subj = sb ? extract(sb.subject) : { main: "", notes: [] };
-        bullets.push({ subject: subj.main, subjectNotes: subj.notes, lines: [], notes: [] });
+        bullets.push({ subject: subj.main, subjectNotes: subj.notes, lines: [], notes: [], rawSubject: sb ? sb.subject.trim() : "", raw: [] });
       }
       var b = bullets[bullets.length - 1];
+      b.raw.push((sb ? sb.body : seg).trim());
       var ex = extract(sb ? sb.body : seg);
       var offset = b.lines.join("\n").length + (b.lines.length ? 1 : 0);
       ex.notes.forEach(function (n) { n.at += offset; b.notes.push(n); });
