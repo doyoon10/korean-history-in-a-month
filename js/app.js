@@ -164,6 +164,92 @@
     return Math.round((new Date(b + "T00:00:00") - new Date(a + "T00:00:00")) / 86400000);
   }
 
+  // ---------- 시험일 ----------
+  // 고른 날짜(S.examDate)가 아직 지나지 않았으면 그날, 아니면 오늘 이후 가장 가까운 회차. 고른 적이 없어도 지난 시험일에 머물지 않는다.
+  var EXAM_BASE = window.EXAM_DATE;
+  function examLeftList() {
+    var t = todayStr();
+    return (window.EXAM_DATES || []).filter(function (x) { return x.date >= t; });
+  }
+  function pickExamDate() {
+    var list = examLeftList(), all = window.EXAM_DATES || [];
+    if (S.examDate && S.examDate >= todayStr()) return S.examDate;
+    if (list.length) return list[0].date;
+    return all.length ? all[all.length - 1].date : EXAM_BASE;
+  }
+  window.EXAM_DATE = pickExamDate();
+  function examRound(date) {
+    var r = (window.EXAM_DATES || []).filter(function (x) { return x.date === date; })[0];
+    return r || null;
+  }
+  var WEEK = ["일", "월", "화", "수", "목", "금", "토"];
+  function longDate(date) {
+    var d = new Date(date + "T00:00:00");
+    return d.getFullYear() + "년 " + (d.getMonth() + 1) + "월 " + d.getDate() + "일(" + WEEK[d.getDay()] + ")";
+  }
+  function examName(date) {
+    var r = examRound(date);
+    return (r ? "제" + r.no + "회 · " : "") + longDate(date);
+  }
+  // 시험일 고르기 창: 남은 회차 + 직접 고르기
+  function openExamPicker() {
+    closeDialog();
+    var t = todayStr(), list = examLeftList(), cur = window.EXAM_DATE;
+    var custom = !examRound(cur) || cur < t;
+    var opts = list.map(function (x) {
+      var left = daysBetween(t, x.date);
+      return '<label class="exam-opt"><input type="radio" name="exam-pick" value="' + x.date + '"' + (x.date === cur ? " checked" : "") + ">" +
+        '<span><b>제' + x.no + "회</b> " + longDate(x.date) + ' <small>' + esc(x.level) + " · " + (left > 0 ? "D-" + left : "D-DAY") + "</small></span></label>";
+    }).join("");
+    var w = document.createElement("div");
+    w.className = "dlg-back";
+    w.innerHTML = '<div class="dlg exam-dlg" role="dialog" aria-modal="true" aria-labelledby="dlg-title">' +
+      '<h2 id="dlg-title">시험일 고르기</h2>' +
+      "<p>D-day, 막판 플랜, 진도 일정이 고른 날짜에 맞춰집니다.</p>" +
+      '<div class="exam-opts">' + (opts || '<p class="exam-none">공고된 남은 회차가 없습니다. 날짜를 직접 고르세요.</p>') +
+      '<label class="exam-opt"><input type="radio" name="exam-pick" value="custom"' + (custom || !list.length ? " checked" : "") + ">" +
+      '<span>직접 고르기 <input type="date" id="exam-custom" min="' + t + '" value="' + (custom && cur >= t ? cur : "") + '"></span></label></div>' +
+      '<div class="dlg-btns"><button type="button" class="mini" data-dlg="no">취소</button><button type="button" class="mini active" data-dlg="yes">바꾸기</button></div></div>';
+    function done(ok) {
+      if (!ok) return closeDialog();
+      var on = $('input[name="exam-pick"]:checked', w), v = on ? on.value : "";
+      if (v === "custom") v = $("#exam-custom", w).value;
+      if (!v || v < t) { $("#exam-custom", w).focus(); return; }
+      closeDialog();
+      if (v === window.EXAM_DATE && S.examDate === v) return;
+      S.examDate = v;
+      save();
+      location.reload();   // D-day, 플랜, 진도 일정, 분석의 날짜를 한 번에 맞춘다
+    }
+    w.addEventListener("click", function (e) {
+      var b = e.target.closest("[data-dlg]");
+      if (b) done(b.dataset.dlg === "yes");
+      else if (e.target === w) done(false);
+    });
+    w.addEventListener("input", function (e) { if (e.target.id === "exam-custom") $('input[value="custom"]', w).checked = true; });
+    w.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") { e.preventDefault(); done(false); }
+      else if (e.key === "Enter" && e.target.tagName !== "BUTTON") { e.preventDefault(); done(true); }
+      else if (e.key === "Tab") {   // 초점이 창 밖으로 나가지 않게 한다
+        var fs = $$("input,button", w), i = fs.indexOf(document.activeElement);
+        e.preventDefault();
+        fs[(i + (e.shiftKey ? fs.length - 1 : 1)) % fs.length].focus();
+      }
+    });
+    dlgBack = document.activeElement;
+    document.body.appendChild(w);
+    ($('input[name="exam-pick"]:checked', w) || $("button", w)).focus();
+  }
+  function renderExamRow() {
+    var host = $("#exam-row");
+    if (!host) return;
+    var left = daysBetween(todayStr(), window.EXAM_DATE);
+    host.innerHTML = '<span class="exam-row-k">시험일</span><b>' + esc(examName(window.EXAM_DATE)) + "</b>" +
+      '<span class="exam-row-d">' + (left > 0 ? "D-" + left : left === 0 ? "D-DAY" : "지남") + "</span>" +
+      '<button class="mini" type="button" id="exam-pick">바꾸기</button>';
+    $("#exam-pick", host).onclick = openExamPicker;
+  }
+
   var ERA_NAMES = {};
   (window.CONCEPTS || []).forEach(function (e) { ERA_NAMES[e.id] = e.name; });
 
@@ -172,6 +258,9 @@
     var left = daysBetween(todayStr(), window.EXAM_DATE);
     var el = $("#dday .dday-num");
     el.textContent = left > 0 ? "D-" + left : (left === 0 ? "D-DAY" : "종료");
+    var r = examRound(window.EXAM_DATE);
+    $("#dday .dday-label").textContent = (r ? "제" + r.no + "회 · " : "") + window.EXAM_DATE.replace(/-/g, ".");
+    renderExamRow();
     $("#stat-days").textContent = left > 0 ? left + "일" : "0일";
 
     var topics = 0;
@@ -3632,6 +3721,7 @@
   initReset();
   initAnalysis();
   initPlanCourse();
+  $("#dday").addEventListener("click", openExamPicker);
   renderPlan();
   renderDash();
 })();
