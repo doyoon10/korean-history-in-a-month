@@ -87,13 +87,13 @@ button{font-family:inherit;cursor:pointer}
 .brand-text{min-width:0}
 .brand-title{font-weight:800;font-size:15.5px;letter-spacing:-.3px;line-height:1.3;white-space:nowrap}
 .brand-sub{font-size:11.5px;color:var(--ink-soft);white-space:nowrap}
-.dday{grid-area:dday;display:flex;align-items:baseline;justify-content:space-between;gap:8px;
+.dday{grid-area:dday;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:6px;
   background:linear-gradient(135deg,var(--hero-a),var(--hero-b));border:1px solid var(--hero-line);color:var(--hero-ink);
   border-radius:12px;padding:13px 14px}
 button.dday{appearance:none;font:inherit;text-align:left;cursor:pointer;width:100%}
 button.dday:hover{filter:brightness(1.08)}
 button.dday:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.dday-num{font-size:27px;font-weight:800;line-height:1;letter-spacing:-1px;color:var(--hero-ink)}
+.dday-num{font-size:27px;font-weight:800;line-height:1;letter-spacing:-1px;color:var(--hero-ink);white-space:nowrap}
 .dday-label{font-size:11.5px;opacity:.85;white-space:nowrap}
 
 .tabs{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:2px;padding:4px 10px 12px}
@@ -531,7 +531,7 @@ details.fold-card[open]>summary{margin-bottom:14px}
   :root{--side-w:78px}
   .topbar-inner{grid-template-columns:1fr;grid-template-areas:"brand" "dday" "toggle";justify-items:center;gap:12px;padding:16px 8px 10px}
   .brand-text,.dday-label,.tab-name,.side-foot{display:none}
-  .dday{width:100%;justify-content:center;padding:8px 2px}
+  .dday{width:100%;align-items:center;justify-content:center;padding:8px 2px}
   .dday-num{font-size:16px;letter-spacing:-.5px}
   .tabs{padding:4px 8px 12px}
   .tab{flex-direction:column;justify-content:center;gap:3px;padding:9px 0 7px;font-size:10.5px}
@@ -542,7 +542,7 @@ details.fold-card[open]>summary{margin-bottom:14px}
   .shell:has(#view-mock.active #mock-run:not(.hidden)){--side-w:78px}
   .shell:has(#view-mock.active #mock-run:not(.hidden)) .topbar-inner{grid-template-columns:1fr;grid-template-areas:"brand" "dday" "toggle";justify-items:center;gap:12px;padding:16px 8px 10px}
   .shell:has(#view-mock.active #mock-run:not(.hidden)) :is(.brand-text,.dday-label,.tab-name,.side-foot){display:none}
-  .shell:has(#view-mock.active #mock-run:not(.hidden)) .dday{width:100%;justify-content:center;padding:8px 2px}
+  .shell:has(#view-mock.active #mock-run:not(.hidden)) .dday{width:100%;align-items:center;justify-content:center;padding:8px 2px}
   .shell:has(#view-mock.active #mock-run:not(.hidden)) .dday-num{font-size:16px;letter-spacing:-.5px}
   .shell:has(#view-mock.active #mock-run:not(.hidden)) .tabs{padding:4px 8px 12px}
   .shell:has(#view-mock.active #mock-run:not(.hidden)) .tab{flex-direction:column;justify-content:center;gap:3px;padding:9px 0 7px;font-size:10.5px}
