@@ -1,5 +1,5 @@
 // 로그인 처리. GET: 잠금이 켜져 있는지 알려 주거나(?out=1이면 잠그고 로그인 화면으로), POST: 비밀번호를 확인하고 쿠키를 준다.
-import { COOKIE, MARK, DAYS, makeToken, same, sha } from "../lib/auth.js";
+import { COOKIE, MARK, DAYS, makeToken, same, sha, sitePassword } from "../lib/auth.js";
 
 export const config = { runtime: "edge" };
 
@@ -10,7 +10,7 @@ function json(body, status, cookies) {
 }
 
 export default async function handler(request) {
-  const password = process.env.SITE_PASSWORD;
+  const password = sitePassword();
   const url = new URL(request.url);
 
   if (request.method === "GET") {
